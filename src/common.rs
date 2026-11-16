@@ -2506,7 +2506,37 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
+/// qubeDesk: сервер и ключ вшиты и поверх любых настроек, поля сервера
+/// скрыты — приложение ходит только на сервер qubeOS. Проверка обновлений
+/// RustDesk выключена: обновления приходят от нас.
+const QUBEDESK_SERVER: &str = "qubeos.ru";
+
+fn apply_qubedesk() {
+    *config::APP_NAME.write().unwrap() = "qubeDesk".to_owned();
+    {
+        let mut o = config::OVERWRITE_SETTINGS.write().unwrap();
+        o.insert("custom-rendezvous-server".into(), QUBEDESK_SERVER.into());
+        o.insert("relay-server".into(), format!("{QUBEDESK_SERVER}:{}", config::RELAY_PORT));
+        o.insert("key".into(), config::RS_PUB_KEY.into());
+        o.insert(keys::OPTION_ALLOW_AUTO_UPDATE.into(), "N".into());
+    }
+    {
+        let mut l = config::OVERWRITE_LOCAL_SETTINGS.write().unwrap();
+        l.insert(keys::OPTION_ENABLE_CHECK_UPDATE.into(), "N".into());
+    }
+    let mut b = config::BUILTIN_SETTINGS.write().unwrap();
+    for k in [
+        keys::OPTION_HIDE_SERVER_SETTINGS,
+        keys::OPTION_HIDE_WEBSOCKET_SETTINGS,
+        keys::OPTION_HIDE_HELP_CARDS,
+        keys::OPTION_HIDE_POWERED_BY_ME,
+    ] {
+        b.insert(k.into(), "Y".into());
+    }
+}
+
 pub fn load_custom_client() {
+    apply_qubedesk();
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());

@@ -113,8 +113,9 @@ const CHARS: &[char] = &[
     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
+// qubeDesk: только наш сервер и его ключ
+pub const RENDEZVOUS_SERVERS: &[&str] = &["qubeos.ru"];
+pub const RS_PUB_KEY: &str = "eWLiEd0cd+wxiP+eN170J1CbZsLEbwB9QkId1o6BjFI=";
 
 pub const RENDEZVOUS_PORT: i32 = 21116;
 pub const RELAY_PORT: i32 = 21117;
