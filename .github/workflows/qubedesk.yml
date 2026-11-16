@@ -170,7 +170,7 @@ jobs:
 
         mkdir -p ./SignOutput
 
-        mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+        mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/qubedesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
 
         '
     - name: Add MSBuild to PATH
@@ -181,7 +181,7 @@ jobs:
       if: env.UPLOAD_ARTIFACT == 'true'
       run: 'pushd ./res/msi
 
-        python preprocess.py --arp -d ../../rustdesk
+        python preprocess.py --arp -c --app-name qubeDesk --manufacturer qubeOS -d ../../rustdesk
 
         nuget restore msi.sln
 
@@ -191,9 +191,9 @@ jobs:
 
         $msi = Get-ChildItem ./Package/bin/*/Release/en-us/Package.msi | Select-Object -First 1
 
-        mv $msi.FullName ../../SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
+        mv $msi.FullName ../../SignOutput/qubedesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
 
-        sha256sum ../../SignOutput/rustdesk-*.msi
+        sha256sum ../../SignOutput/qubedesk-*.msi
 
         '
     - name: 'qubeDesk: выложить установщики'
@@ -337,7 +337,7 @@ jobs:
 
         sed -i -e ''s/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/'' "$CREATE_DMG"
 
-        create-dmg --icon "RustDesk.app" 200 190 --hide-extension "RustDesk.app" --window-size 800 400 --app-drop-link 600 185 rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/RustDesk.app
+        create-dmg --icon "qubeDesk.app" 200 190 --hide-extension "qubeDesk.app" --window-size 800 400 --app-drop-link 600 185 qubedesk-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/qubeDesk.app
 
         '
     - name: Rename rustdesk
@@ -346,10 +346,10 @@ jobs:
       env:
         VERSION: ${{ env.VERSION }}
         ARCH: ${{ matrix.job.arch }}
-      run: "if [ -f \"rustdesk-${VERSION}.dmg\" ]; then\n    mv \"rustdesk-${VERSION}.dmg\" \"rustdesk-${VERSION}-${ARCH}.dmg\"\nfi\ntest -f \"rustdesk-${VERSION}-${ARCH}.dmg\"\n"
+      run: "if [ -f \"qubedesk-${VERSION}.dmg\" ]; then\n    mv \"qubedesk-${VERSION}.dmg\" \"qubedesk-${VERSION}-${ARCH}.dmg\"\nfi\ntest -f \"qubedesk-${VERSION}-${ARCH}.dmg\"\n"
     - name: 'qubeDesk: выложить установщик'
       uses: actions/upload-artifact@v4
       with:
         name: qubedesk-macos-${{ matrix.job.arch }}
-        path: rustdesk-*.dmg
+        path: qubedesk-*.dmg
         if-no-files-found: error

@@ -52,8 +52,23 @@ mac['steps'].insert(step_index(mac, 'Build rustdesk'), {
            '  sips -z $s $s res/mac-icon.png --out $I/icon_${s}x${s}.png >/dev/null\n'
            '  sips -z $((s*2)) $((s*2)) res/mac-icon.png --out $I/icon_${s}x${s}@2x.png >/dev/null\n'
            'done\niconutil -c icns $I -o flutter/macos/Runner/AppIcon.icns\n'})
+# Программа называется qubeDesk.app, установщики — qubedesk-…
+for st in mac['steps']:
+    if st.get('name') == 'create unsigned dmg':
+        st['run'] = st['run'].replace('RustDesk.app', 'qubeDesk.app').replace('rustdesk-${{ env.VERSION }}', 'qubedesk-${{ env.VERSION }}')
+    if st.get('name') == 'Rename rustdesk':
+        st['run'] = st['run'].replace('rustdesk-', 'qubedesk-')
+for st in win['steps']:
+    if st.get('name') == 'Build self-extracted executable':
+        st['run'] = st['run'].replace('SignOutput/rustdesk-', 'SignOutput/qubedesk-')
+    if st.get('name') == 'Build msi':
+        st['run'] = (st['run'].replace('preprocess.py --arp -d', 'preprocess.py --arp -c --app-name qubeDesk --manufacturer qubeOS -d')
+                     .replace('SignOutput/rustdesk-', 'SignOutput/qubedesk-'))
+for st, want in [(s, 'qubedesk-') for s in mac['steps'] + win['steps'] if s.get('name') in ('create unsigned dmg', 'Build self-extracted executable', 'Build msi')]:
+    assert want in st['run'], st['name']
+
 mac['steps'].append({'name': 'qubeDesk: выложить установщик', 'uses': 'actions/upload-artifact@v4',
-    'with': {'name': 'qubedesk-macos-${{ matrix.job.arch }}', 'path': 'rustdesk-*.dmg', 'if-no-files-found': 'error'}})
+    'with': {'name': 'qubedesk-macos-${{ matrix.job.arch }}', 'path': 'qubedesk-*.dmg', 'if-no-files-found': 'error'}})
 
 wf = {
     'name': 'Сборка qubeDesk',
