@@ -70,7 +70,8 @@ for st in win['steps']:
     if st.get('name') == 'Build self-extracted executable':
         st['run'] = st['run'].replace('SignOutput/rustdesk-', 'SignOutput/qubedesk-')
     if st.get('name') == 'Build msi':
-        st['run'] = (st['run'].replace('preprocess.py --arp -d', 'preprocess.py --arp -c --app-name qubeDesk --manufacturer qubeOS -d')
+        # MSI под именем qubeDesk ищет qubeDesk.exe — так программа и будет называться у людей
+        st['run'] = ('Move-Item -Force ./rustdesk/rustdesk.exe ./rustdesk/qubeDesk.exe\n' + st['run'].replace('preprocess.py --arp -d', 'preprocess.py --arp -c --app-name qubeDesk --manufacturer qubeOS -d')
                      .replace('SignOutput/rustdesk-', 'SignOutput/qubedesk-'))
 for st, want in [(s, 'qubedesk-') for s in mac['steps'] + win['steps'] if s.get('name') in ('create unsigned dmg', 'Build self-extracted executable', 'Build msi')]:
     assert want in st['run'], st['name']

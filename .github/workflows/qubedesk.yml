@@ -179,7 +179,9 @@ jobs:
         msbuild-architecture: ${{ matrix.job.arch == 'aarch64' && 'arm64' || 'x86' }}
     - name: Build msi
       if: env.UPLOAD_ARTIFACT == 'true'
-      run: 'pushd ./res/msi
+      run: 'Move-Item -Force ./rustdesk/rustdesk.exe ./rustdesk/qubeDesk.exe
+
+        pushd ./res/msi
 
         python preprocess.py --arp -c --app-name qubeDesk --manufacturer qubeOS -d ../../rustdesk
 
