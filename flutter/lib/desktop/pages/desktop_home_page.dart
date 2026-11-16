@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/widgets/qube_glass.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
@@ -55,19 +56,215 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   final GlobalKey _childKey = GlobalKey();
 
+  /// Раздел в боковой панели: 0 — «Подключиться», 1–3 — «Недавние»,
+  /// «Избранное», «В этой сети» (это вкладки RustDesk, только выбираются слева)
+  final RxInt _section = 0.obs;
+
+  void _select(int s) {
+    _section.value = s;
+    gFFI.peerTabModel.setCurrentTab(s == 0 ? 0 : s - 1);
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
+    // Только входящие (без своего списка компьютеров) — прежняя узкая раскладка
+    if (isIncomingOnly) {
+      return _buildBlock(
+          child: QubeBackdrop(
+              child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: QubeGlass(child: buildLeftPane(context)),
+      )));
+    }
+    // qubeDesk: боковая панель как в приложениях qubeOS и экран справа
     return _buildBlock(
-        child: Row(
+        child: QubeBackdrop(
+            child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ChangeNotifierProvider.value(
+            value: gFFI.serverModel, child: _buildSidebar(context)),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 22, 28, 20),
+            child: Obx(() => ConnectionPage(
+                  section: _section.value,
+                  thisComputer: ChangeNotifierProvider.value(
+                      value: gFFI.serverModel,
+                      child: Consumer<ServerModel>(
+                          builder: (ctx, _, __) => _buildThisComputer(ctx))),
+                )),
+          ),
+        ),
+      ],
+    )));
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    final isOutgoingOnly = bind.isOutgoingOnly();
+    final settings = !bind.isDisableSettings();
+    item(int s, IconData icon, String label) => Obx(() => QubeSideItem(
+        icon: icon,
+        label: label,
+        selected: _section.value == s,
+        onTap: () => _select(s)));
+    return QubeSidebar(children: [
+      const QubeBrand(),
+      item(0, Icons.screen_share_outlined, 'Подключиться'),
+      const QubeSideLabel('Компьютеры'),
+      item(1, Icons.history_rounded, 'Недавние'),
+      item(2, Icons.star_outline_rounded, 'Избранное'),
+      item(3, Icons.wifi_rounded, 'В этой сети'),
+      if (!isOutgoingOnly && settings) const QubeSideLabel('Этот компьютер'),
+      if (!isOutgoingOnly && settings)
+        QubeSideItem(
+            icon: Icons.shield_outlined,
+            label: 'Доступ и пароль',
+            onTap: () => DesktopSettingPage.switch2page(SettingsTabKey.safety)),
+      // Подсказки RustDesk: установить, дать разрешения на Mac — нужны,
+      // поэтому живут здесь, над настройками
+      Expanded(
+        child: SingleChildScrollView(
+          controller: _leftPaneScrollController,
+          child: Column(
+            key: _childKey,
+            children: [
+              if (!isOutgoingOnly) buildPresetPasswordWarning(),
+              Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+            ],
+          ),
+        ),
+      ),
+      if (settings)
+        QubeSideItem(
+            icon: Icons.settings_outlined,
+            label: 'Настройки',
+            onTap: () {
+              if (DesktopSettingPage.tabKeys.isNotEmpty) {
+                DesktopSettingPage.switch2page(DesktopSettingPage.tabKeys[0]);
+              }
+            }),
+      const SizedBox(height: 6),
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: (Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black)
+              .withOpacity(0.05),
+        ),
+        child: const OnlineStatusWidget(),
+      ),
+    ]);
+  }
+
+  /// Карточка «Этот компьютер»: номер одной строкой, пароль, где стоит.
+  Widget _buildThisComputer(BuildContext context) {
+    final model = gFFI.serverModel;
+    final mut = Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.55);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final showOneTime = model.approveMode != 'click' &&
+        model.verificationMethod != kUsePermanentPassword;
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        buildLeftPane(context),
-        if (!isIncomingOnly) const VerticalDivider(width: 1),
-        if (!isIncomingOnly) Expanded(child: buildRightPane(context)),
+        const QubeCardLabel(Icons.important_devices_outlined, 'Этот компьютер'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: model.serverId,
+                  builder: (_, v, __) => Text(
+                      v.text.isEmpty ? '…' : v.text,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: qubeTitle(34)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            QubeIconButton(
+              icon: Icons.copy_rounded,
+              tooltip: 'Скопировать номер',
+              size: 34,
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: model.serverId.text));
+                showToast('Номер скопирован');
+              },
+            ),
+          ],
+        ),
+        if (!bind.isOutgoingOnly())
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.white.withOpacity(dark ? 0.06 : 0.8),
+              border: Border.all(
+                  color: (dark ? Colors.white : Colors.black)
+                      .withOpacity(dark ? 0.14 : 0.10)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                          showOneTime
+                              ? 'Одноразовый пароль'
+                              : 'Постоянный пароль',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11.5, color: mut)),
+                      const SizedBox(height: 2),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: model.serverPasswd,
+                        builder: (_, v, __) => Text(
+                            showOneTime ? v.text : '••••••',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: qubeTitle(20)
+                                .copyWith(letterSpacing: 1.5)),
+                      ),
+                    ],
+                  ),
+                ),
+                if (showOneTime)
+                  QubeIconButton(
+                    icon: Icons.refresh_rounded,
+                    tooltip: 'Новый пароль',
+                    size: 34,
+                    onTap: () => bind.mainUpdateTemporaryPassword(),
+                  ),
+                if (!bind.isDisableSettings()) ...[
+                  const SizedBox(width: 6),
+                  QubeIconButton(
+                    icon: Icons.edit_outlined,
+                    tooltip: 'Изменить пароль',
+                    size: 34,
+                    onTap: () =>
+                        DesktopSettingPage.switch2page(SettingsTabKey.safety),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Назовите номер и пароль помощнику.',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12.5, color: mut)),
       ],
-    ));
+    );
   }
 
   Widget _buildBlock({required Widget child}) {
@@ -129,8 +326,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
-        width: isIncomingOnly ? 280.0 : 200.0,
-        color: Theme.of(context).colorScheme.background,
+        width: isIncomingOnly ? 280.0 : 210.0,
+        color: Colors.transparent,
         child: Stack(
           children: [
             Column(
@@ -179,10 +376,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildRightPane(BuildContext context) {
-    return Container(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      child: ConnectionPage(),
-    );
+    return ConnectionPage();
   }
 
   buildIDBoard(BuildContext context) {
@@ -238,9 +432,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           border: InputBorder.none,
                           contentPadding: EdgeInsets.only(top: 10, bottom: 10),
                         ),
-                        style: TextStyle(
-                          fontSize: 22,
-                        ),
+                        style: qubeTitle(24),
                       ).workaroundFreezeLinuxMint(),
                     ),
                   )
@@ -402,7 +594,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   alignment: Alignment.centerLeft,
                   child: Text(
                     translate("Your Desktop"),
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: Theme.of(context).textTheme.titleLarge?.merge(TextStyle(fontFamily: 'Jost', fontWeight: FontWeight.w500, fontVariations: [FontVariation('wght', 500)])),
                   ),
                 ),
             ],

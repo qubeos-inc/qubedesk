@@ -16,7 +16,7 @@ Widget getConnectionPageTitle(BuildContext context, bool isWeb) {
             style: Theme.of(context)
                 .textTheme
                 .titleLarge
-                ?.merge(TextStyle(height: 1)),
+                ?.merge(TextStyle(fontFamily: 'Jost', fontWeight: FontWeight.w500, fontVariations: [FontVariation('wght', 500)], height: 1)),
           ).marginOnly(right: 4),
           Tooltip(
             waitDuration: Duration(milliseconds: 300),

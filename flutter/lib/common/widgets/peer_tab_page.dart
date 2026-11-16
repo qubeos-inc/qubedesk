@@ -27,7 +27,10 @@ import '../../common.dart';
 import '../../models/platform_model.dart';
 
 class PeerTabPage extends StatefulWidget {
-  const PeerTabPage({Key? key}) : super(key: key);
+  const PeerTabPage({Key? key, this.hideSwitchBar = false}) : super(key: key);
+
+  /// qubeDesk: вкладки выбираются в боковой панели, своя полоса не нужна
+  final bool hideSwitchBar;
   @override
   State<PeerTabPage> createState() => _PeerTabPageState();
 }
@@ -120,8 +123,10 @@ class _PeerTabPageState extends State<PeerTabPage>
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                        child: visibleContextMenuListener(
-                            _createSwitchBar(context))),
+                        child: widget.hideSwitchBar
+                            ? const SizedBox.shrink()
+                            : visibleContextMenuListener(
+                                _createSwitchBar(context))),
                     if (stateGlobal.isPortrait.isTrue)
                       ..._portraitRightActions(context)
                     else

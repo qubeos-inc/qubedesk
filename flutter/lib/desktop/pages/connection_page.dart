@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/common/widgets/connection_page_title.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/widgets/popup_menu.dart';
 import 'package:flutter_hbb/models/state_model.dart';
@@ -17,6 +16,7 @@ import 'package:flutter_hbb/models/peer_model.dart';
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/peer_tab_page.dart';
+import '../../common/widgets/qube_glass.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
@@ -125,9 +125,11 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
                         : Color.fromARGB(255, 224, 79, 95)),
               ),
             ).marginSymmetric(horizontal: em),
-            Container(
-              width: isIncomingOnly ? 226 : null,
-              child: _buildConnStatusMsg(),
+            Flexible(
+              child: Container(
+                width: isIncomingOnly ? 226 : null,
+                child: _buildConnStatusMsg(),
+              ),
             ),
             // stop
             if (!isIncomingOnly) startServiceWidget(),
@@ -157,12 +159,14 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
     widget.onSvcStatusChanged?.call();
     return Text(
       _svcStopped.value
-          ? translate("Service is not running")
+          ? 'Служба остановлена'
           : stateGlobal.svcStatus.value == SvcStatus.connecting
-              ? translate("connecting_status")
+              ? 'Подключаемся к qubeOS…'
               : stateGlobal.svcStatus.value == SvcStatus.notReady
-                  ? translate("not_ready_status")
-                  : translate('Ready'),
+                  ? 'Нет связи с сервером'
+                  : 'На связи с qubeOS',
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: TextStyle(fontSize: em),
     );
   }
@@ -189,7 +193,14 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
 
 /// Connection page for connecting to a remote peer.
 class ConnectionPage extends StatefulWidget {
-  const ConnectionPage({Key? key}) : super(key: key);
+  const ConnectionPage({Key? key, this.section = 0, this.thisComputer})
+      : super(key: key);
+
+  /// qubeDesk: 0 — «Подключиться», 1–3 — «Недавние», «Избранное», «В этой сети»
+  final int section;
+
+  /// Карточка «Этот компьютер» — её собирает главное окно, у него модель сервера
+  final Widget? thisComputer;
 
   @override
   State<ConnectionPage> createState() => _ConnectionPageState();
@@ -301,26 +312,58 @@ class _ConnectionPageState extends State<ConnectionPage>
     }
   }
 
+  static const _titles = ['Подключиться', 'Недавние', 'Избранное', 'В этой сети'];
+  static const _subtitles = [
+    'Помогите коллеге или откройте свой компьютер издалека',
+    'Компьютеры, к которым вы подключались',
+    'Компьютеры, отмеченные звёздочкой',
+    'Компьютеры с qubeDesk в вашей локальной сети',
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final isOutgoingOnly = bind.isOutgoingOnly();
+    final s = widget.section.clamp(0, 3);
+    final list = Expanded(
+        child: QubeGlass(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 0),
+            child: PeerTabPage(hideSwitchBar: true)));
+    if (s != 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          QubeHeader(_titles[s], subtitle: _subtitles[s]),
+          const SizedBox(height: 18),
+          list,
+        ],
+      );
+    }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-            child: Column(
-          children: [
-            Row(
-              children: [
-                Flexible(child: _buildRemoteIDTextField(context)),
+        QubeHeader(_titles[0], subtitle: _subtitles[0]),
+        const SizedBox(height: 18),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (widget.thisComputer != null) ...[
+                Expanded(
+                    flex: 10,
+                    child: QubeGlass(
+                        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                        child: widget.thisComputer!)),
+                const SizedBox(width: 14),
               ],
-            ).marginOnly(top: 22),
-            SizedBox(height: 12),
-            Divider().paddingOnly(right: 12),
-            Expanded(child: PeerTabPage()),
-          ],
-        ).paddingOnly(left: 12.0)),
-        if (!isOutgoingOnly) const Divider(height: 1),
-        if (!isOutgoingOnly) OnlineStatusWidget()
+              Expanded(
+                  flex: 14,
+                  child: QubeGlass(child: _buildRemoteIDTextField(context))),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text('Недавние', maxLines: 1, style: qubeTitle(19)),
+        const SizedBox(height: 10),
+        list,
       ],
     );
   }
@@ -377,15 +420,12 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
     var w = Container(
-      width: 320 + 20 * 2,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
-      decoration: BoxDecoration(
-          borderRadius: const BorderRadius.all(Radius.circular(13)),
-          border: Border.all(color: Theme.of(context).colorScheme.background)),
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
       child: Ink(
         child: Column(
           children: [
-            getConnectionPageTitle(context, false).marginOnly(bottom: 15),
+            const QubeCardLabel(Icons.cast_outlined, 'Другой компьютер')
+                .marginOnly(bottom: 14),
             Row(
               children: [
                 Expanded(
@@ -551,22 +591,33 @@ class _ConnectionPageState extends State<ConnectionPage>
             Padding(
               padding: const EdgeInsets.only(top: 13.0),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                SizedBox(
-                  height: 28.0,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      onConnect();
-                    },
-                    child: Text(translate("Connect")),
-                  ),
+                QubeButton(
+                  label: 'Подключиться',
+                  height: 40,
+                  onPressed: () => onConnect(),
                 ),
+                const Spacer(),
+                QubeIconButton(
+                    icon: Icons.drive_folder_upload_outlined,
+                    tooltip: 'Передать файлы',
+                    onTap: () => onConnect(isFileTransfer: true)),
+                const SizedBox(width: 6),
+                QubeIconButton(
+                    icon: Icons.videocam_outlined,
+                    tooltip: 'Камера',
+                    onTap: () => onConnect(isViewCamera: true)),
+                const SizedBox(width: 6),
+                QubeIconButton(
+                    icon: Icons.terminal_rounded,
+                    tooltip: 'Терминал',
+                    onTap: () => onConnect(isTerminal: true)),
                 const SizedBox(width: 8),
                 Container(
-                  height: 28.0,
-                  width: 28.0,
+                  height: 40.0,
+                  width: 40.0,
                   decoration: BoxDecoration(
                     border: Border.all(color: Theme.of(context).dividerColor),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Center(
                     child: StatefulBuilder(

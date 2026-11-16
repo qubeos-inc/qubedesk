@@ -169,6 +169,9 @@ flutter:
           weight: 600
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
+    - family: Jost
+      fonts:
+        - asset: assets/fonts/Jost.ttf
     - family: GestureIcons
       fonts:
         - asset: assets/gestures.ttf
