@@ -86,7 +86,21 @@ wf = {
     'jobs': {'generate-bridge': bridge, 'build-RustDeskTempTopMostWindow': top,
              'build-for-windows-flutter': win, 'build-for-macOS': mac},
 }
+# Отдельный запуск только для Mac на Apple (M1–M4): у GitHub часто нет
+# свободных macos-15 arm64, а macos-14 — тоже arm64, но другая очередь
+arm = copy.deepcopy(mac)
+arm['strategy']['matrix']['job'] = [dict(m, os='${{ inputs.runner }}') for m in arm['strategy']['matrix']['job'] if m['arch'] == 'aarch64']
+wf_arm = {
+    'name': 'Сборка qubeDesk — Mac Apple',
+    'on': {'workflow_dispatch': {'inputs': {
+        'upload-artifact': {'type': 'boolean', 'default': True, 'description': 'Собрать установщик'},
+        'runner': {'type': 'string', 'default': 'macos-14', 'description': 'Машина GitHub (arm64)'}}}},
+    'env': env,
+    'jobs': {'generate-bridge': copy.deepcopy(bridge), 'build-for-macOS': arm},
+}
+
 head = '# Создано .github/scripts/make-qubedesk-workflow.py — правьте сценарий, а не этот файл\n'
 out = yaml.safe_dump(wf, allow_unicode=True, sort_keys=False, width=1000)
 (root / 'workflows/qubedesk.yml').write_text(head + out)
-print('готово:', root / 'workflows/qubedesk.yml')
+(root / 'workflows/qubedesk-mac-arm.yml').write_text(head + yaml.safe_dump(wf_arm, allow_unicode=True, sort_keys=False, width=1000))
+print('готово:', root / 'workflows/qubedesk.yml', root / 'workflows/qubedesk-mac-arm.yml')
