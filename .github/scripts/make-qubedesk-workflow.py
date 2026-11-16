@@ -52,6 +52,14 @@ mac['steps'].insert(step_index(mac, 'Build rustdesk'), {
            '  sips -z $s $s res/mac-icon.png --out $I/icon_${s}x${s}.png >/dev/null\n'
            '  sips -z $((s*2)) $((s*2)) res/mac-icon.png --out $I/icon_${s}x${s}@2x.png >/dev/null\n'
            'done\niconutil -c icns $I -o flutter/macos/Runner/AppIcon.icns\n'})
+# build.py докладывает service в уже подписанный пакет — подпись ломается,
+# и macOS называет программу «повреждённой». Без сертификата Apple ставим
+# ad-hoc подпись на весь пакет заново, перед упаковкой в dmg.
+mac['steps'].insert(step_index(mac, 'create unsigned dmg'), {
+    'name': 'qubeDesk: подпись ad-hoc', 'shell': 'bash',
+    'run': 'set -e\nAPP=./flutter/build/macos/Build/Products/Release/qubeDesk.app\n'
+           'codesign --force --deep --sign - "$APP"\ncodesign --verify --deep --strict --verbose=2 "$APP"\n'})
+
 # Программа называется qubeDesk.app, установщики — qubedesk-…
 for st in mac['steps']:
     if st.get('name') == 'create unsigned dmg':
