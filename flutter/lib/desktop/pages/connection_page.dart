@@ -312,17 +312,18 @@ class _ConnectionPageState extends State<ConnectionPage>
     }
   }
 
-  static const _titles = ['Подключиться', 'Недавние', 'Избранное', 'В этой сети'];
+  static const _titles = ['Подключиться', 'Недавние', 'Избранное', 'В этой сети', 'Подразделения'];
   static const _subtitles = [
     'Помогите коллеге или откройте свой компьютер издалека',
     'Компьютеры, к которым вы подключались',
     'Компьютеры, отмеченные звёздочкой',
     'Компьютеры с qubeDesk в вашей локальной сети',
+    'Компьютеры точек из qubeOS',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.section.clamp(0, 3);
+    final s = widget.section.clamp(0, 4);
     final list = Expanded(
         child: QubeGlass(
             padding: const EdgeInsets.fromLTRB(14, 10, 6, 0),

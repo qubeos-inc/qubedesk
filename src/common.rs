@@ -2510,6 +2510,7 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 /// скрыты — приложение ходит только на сервер qubeOS. Проверка обновлений
 /// RustDesk выключена: обновления приходят от нас.
 const QUBEDESK_SERVER: &str = "qubeos.ru";
+const QUBEDESK_API: &str = "https://qubeos.ru/api/qubedesk";
 
 fn apply_qubedesk() {
     *config::APP_NAME.write().unwrap() = "qubeDesk".to_owned();
@@ -2518,6 +2519,8 @@ fn apply_qubedesk() {
         o.insert("custom-rendezvous-server".into(), QUBEDESK_SERVER.into());
         o.insert("relay-server".into(), format!("{QUBEDESK_SERVER}:{}", config::RELAY_PORT));
         o.insert("key".into(), config::RS_PUB_KEY.into());
+        // «Сервер учёток» — сам портал: вход учёткой qubeOS, подразделения, журнал
+        o.insert("api-server".into(), QUBEDESK_API.into());
         o.insert(keys::OPTION_ALLOW_AUTO_UPDATE.into(), "N".into());
     }
     {

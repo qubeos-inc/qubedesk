@@ -9,6 +9,7 @@ import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
 import 'package:flutter_hbb/common/widgets/qube_glass.dart';
+import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
@@ -56,13 +57,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   final GlobalKey _childKey = GlobalKey();
 
-  /// Раздел в боковой панели: 0 — «Подключиться», 1–3 — «Недавние»,
-  /// «Избранное», «В этой сети» (это вкладки RustDesk, только выбираются слева)
+  /// Раздел в боковой панели: 0 — «Подключиться», 1 — «Недавние»,
+  /// 2 — «Избранное», 3 — «В этой сети», 4 — «Подразделения».
+  /// Это вкладки RustDesk, только выбираются слева.
   final RxInt _section = 0.obs;
+  static const _tabOf = [0, 0, 1, 2, 4];
 
   void _select(int s) {
     _section.value = s;
-    gFFI.peerTabModel.setCurrentTab(s == 0 ? 0 : s - 1);
+    gFFI.peerTabModel.setCurrentTab(_tabOf[s]);
+    // «Подразделения» приходят из qubeOS — обновляем при каждом заходе
+    if (s == 4) gFFI.groupModel.pull(force: true);
   }
 
   @override
@@ -114,6 +119,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       const QubeBrand(),
       item(0, Icons.screen_share_outlined, 'Подключиться'),
       const QubeSideLabel('Компьютеры'),
+      Obx(() => gFFI.userModel.isLogin
+          ? QubeSideItem(
+              icon: Icons.storefront_outlined,
+              label: 'Подразделения',
+              selected: _section.value == 4,
+              onTap: () => _select(4))
+          : const SizedBox.shrink()),
       item(1, Icons.history_rounded, 'Недавние'),
       item(2, Icons.star_outline_rounded, 'Избранное'),
       item(3, Icons.wifi_rounded, 'В этой сети'),
@@ -147,6 +159,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               }
             }),
       const SizedBox(height: 6),
+      _buildAccount(context),
+      const SizedBox(height: 6),
       Container(
         padding: const EdgeInsets.symmetric(vertical: 4),
         decoration: BoxDecoration(
@@ -159,6 +173,76 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: const OnlineStatusWidget(),
       ),
     ]);
+  }
+
+  /// Кто вошёл в qubeDesk. Не вошёл — кнопка входа учёткой qubeOS.
+  Widget _buildAccount(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final mut = Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.55);
+    return Obx(() {
+      final um = gFFI.userModel;
+      if (!um.isLogin) {
+        return QubeSideItem(
+            icon: Icons.login_rounded,
+            label: 'Войти через qubeOS',
+            onTap: () => loginDialog());
+      }
+      final name = um.displayNameOrUserName;
+      final initials = name
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .take(2)
+          .map((w) => w[0].toUpperCase())
+          .join();
+      return Container(
+        padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: (dark ? Colors.white : Colors.black).withOpacity(0.05),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [qubePink, qubePinkSoft]),
+              ),
+              child: Text(initials,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500)),
+                  Text('Учётная запись qubeOS',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: mut)),
+                ],
+              ),
+            ),
+            QubeIconButton(
+              icon: Icons.logout_rounded,
+              tooltip: 'Выйти',
+              size: 30,
+              onTap: () => logOutConfirmDialog(),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   /// Карточка «Этот компьютер»: номер одной строкой, пароль, где стоит.
