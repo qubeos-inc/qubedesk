@@ -68,6 +68,8 @@ message ControlPermissions {
 
 message ControlledContext {
   string conn_audit_ref = 1;
+  // qubeDesk: пропуск от нашего сервера (подпись ключом сервера), см. qubedesk.rs
+  bytes qd_grant = 100;
 }
 
 message PunchHole {

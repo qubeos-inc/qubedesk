@@ -1544,6 +1544,16 @@ impl Connection {
         );
     }
 
+    /// qubeDesk: проверенный пропуск от нашего сервера — (как пускать, кто подключается)
+    fn qd_grant(&self) -> Option<(String, String)> {
+        let g = &self.controlled_context.as_ref()?.qd_grant;
+        if g.is_empty() {
+            return None;
+        }
+        let (mode, who) = std::str::from_utf8(g).ok()?.split_once('\n')?;
+        Some((mode.to_owned(), who.to_owned()))
+    }
+
     fn conn_audit_ref(&self) -> Option<&str> {
         let audit_ref = self
             .controlled_context
@@ -3039,6 +3049,23 @@ impl Connection {
             let allow_logon_screen_password =
                 crate::get_builtin_option(keys::OPTION_ALLOW_LOGON_SCREEN_PASSWORD) == "Y"
                     && is_logon();
+
+            // qubeDesk: свой из qubeOS с пропуском сервера. К служебному компьютеру — сразу,
+            // к личному — без пароля, но сотрудник нажимает «Принять» в окне qubeDesk.
+            if let Some((mode, who)) = self.qd_grant() {
+                let name = format!("{who} · qubeOS");
+                if mode == "auto" {
+                    if !self.send_logon_response_and_keep_alive().await {
+                        return false;
+                    }
+                    self.try_start_cm(lr.my_id.clone(), name, self.authorized);
+                    return true;
+                }
+                if lr.password.is_empty() {
+                    self.try_start_cm(lr.my_id.clone(), name, false);
+                    return true;
+                }
+            }
 
             if (password::approve_mode() == ApproveMode::Click && !allow_logon_screen_password)
                 || password::approve_mode() == ApproveMode::Both && !password::has_valid_password()

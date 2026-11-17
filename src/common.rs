@@ -2446,6 +2446,58 @@ pub fn dtls_fingerprint_bound(signed_fp: &str, actual_fp: &str) -> bool {
     !signed_fp.is_empty() && signed_fp == actual_fp
 }
 
+/// qubeDesk: пропуск без пароля от нашего сервера. Сервер выдаёт его, проверив в qubeOS,
+/// что человек видит точку этого компьютера. Подпись — ключом сервера (тот же, что зашит
+/// в программу), внутри: номер этого компьютера, срок, как пускать, кто подключается, и
+/// адрес подключающегося из того же сообщения сервера. Не сошлось хоть что-то — пропуска нет.
+/// Проверенный пропуск остаётся в `qd_grant` как «режим\nимя».
+pub fn qd_check_grant(
+    ctx: Option<hbb_common::rendezvous_proto::ControlledContext>,
+    bind: &[u8],
+) -> Option<hbb_common::rendezvous_proto::ControlledContext> {
+    let mut ctx = ctx?;
+    if ctx.qd_grant.is_empty() {
+        return Some(ctx);
+    }
+    let checked = (|| -> Option<String> {
+        let pk = get_rs_pk(config::RS_PUB_KEY)?;
+        let payload = sign::verify(&ctx.qd_grant, &pk).ok()?;
+        let mut parts = Vec::new();
+        let mut start = 0;
+        for (i, b) in payload.iter().enumerate() {
+            if *b == b'\n' {
+                parts.push(std::str::from_utf8(&payload[start..i]).ok()?);
+                start = i + 1;
+                if parts.len() == 5 {
+                    break;
+                }
+            }
+        }
+        if parts.len() != 5 || parts[0] != "qdg1" || parts[1] != Config::get_id() {
+            return None;
+        }
+        let exp: u64 = parts[3].parse().ok()?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        // Часы на компьютерах бывают неточны — допускаем пять минут расхождения
+        if now > exp + 300 || &payload[start..] != bind {
+            return None;
+        }
+        let mode = parts[2];
+        if mode != "auto" && mode != "confirm" {
+            return None;
+        }
+        Some(format!("{mode}\n{}", parts[4]))
+    })();
+    if checked.is_none() {
+        log::warn!("qubeDesk: пропуск от сервера не прошёл проверку");
+    }
+    ctx.qd_grant = checked.map(|s| s.into_bytes().into()).unwrap_or_default();
+    Some(ctx)
+}
+
 pub fn create_symmetric_key_msg(their_pk_b: [u8; 32]) -> (Bytes, Bytes, secretbox::Key) {
     let their_pk_b = box_::PublicKey(their_pk_b);
     let (our_pk_b, out_sk_b) = box_::gen_keypair();
