@@ -17,6 +17,8 @@ import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/qube_glass.dart';
+import '../../common/widgets/qube_live.dart';
+import '../../common/widgets/login.dart';
 import '../../common/widgets/autocomplete.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
@@ -312,18 +314,19 @@ class _ConnectionPageState extends State<ConnectionPage>
     }
   }
 
-  static const _titles = ['Подключиться', 'Недавние', 'Избранное', 'В этой сети', 'Подразделения'];
+  static const _titles = ['Подключиться', 'Недавние', 'Избранное', 'В этой сети', 'Подразделения', 'Помощь'];
   static const _subtitles = [
     'Помогите коллеге или откройте свой компьютер издалека',
     'Компьютеры, к которым вы подключались',
     'Компьютеры, отмеченные звёздочкой',
     'Компьютеры с qubeDesk в вашей локальной сети',
     'Компьютеры точек из qubeOS',
+    'Что-то не работает — позовите специалиста, он подключится к этому компьютеру',
   ];
 
   @override
   Widget build(BuildContext context) {
-    final s = widget.section.clamp(0, 4);
+    final s = widget.section.clamp(0, 5);
     final list = Expanded(
         child: QubeGlass(
             padding: const EdgeInsets.fromLTRB(14, 10, 6, 0),
@@ -334,7 +337,14 @@ class _ConnectionPageState extends State<ConnectionPage>
         children: [
           QubeHeader(_titles[s], subtitle: _subtitles[s]),
           const SizedBox(height: 18),
-          list,
+          if (s == 4)
+            const Expanded(child: QubeStoresLive())
+          else if (s == 5)
+            Expanded(
+                child: SingleChildScrollView(
+                    child: QubeHelpLive(onLogin: () => loginDialog())))
+          else
+            list,
         ],
       );
     }
@@ -361,6 +371,8 @@ class _ConnectionPageState extends State<ConnectionPage>
             ],
           ),
         ),
+        // Заявки «Помощь» и приглашения — у того, кто помогает
+        const QubeWaiting(),
         const SizedBox(height: 22),
         Text('Недавние', maxLines: 1, style: qubeTitle(19)),
         const SizedBox(height: 10),

@@ -15,7 +15,7 @@ index 8da29a2..6af6d9b 100644
  pub mod common;
 diff --git a/src/qubedesk.rs b/src/qubedesk.rs
 new file mode 100644
-index 0000000..a0a6221
+index 0000000..599f193
 --- /dev/null
 +++ b/src/qubedesk.rs
 @@ -0,0 +1,182 @@
@@ -174,7 +174,7 @@ index 0000000..a0a6221
 +            Ok(v) => {
 +                let mut cg = CACHE_GRANT.lock().unwrap();
 +                match (v["grant"]["mode"].as_str(), v["grant"]["name"].as_str()) {
-+                    (Some(m), Some(n)) if m == "auto" || m == "confirm" => {
++                    (Some(m), Some(n)) if ["auto", "confirm", "auto-view", "confirm-view"].contains(&m) => {
 +                        cg.insert(k.clone(), (m.to_owned(), n.replace('\n', " ")));
 +                    }
 +                    _ => {

@@ -8,6 +8,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_hbb/common/widgets/qube_glass.dart';
+import 'package:flutter_hbb/common/widgets/qube_stores.dart';
+import 'package:flutter_hbb/common/widgets/qube_help.dart';
+import 'package:flutter_hbb/common/widgets/qube_parts.dart';
 
 Future<void> _font(String family, List<String> files) async {
   final l = FontLoader(family);
@@ -17,7 +20,51 @@ Future<void> _font(String family, List<String> files) async {
   await l.load();
 }
 
-Widget _screen(Brightness b) {
+Widget _storesBody() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const QubeHeader('Подразделения', subtitle: 'Компьютеры точек из qubeOS'),
+        const SizedBox(height: 18),
+        Expanded(
+          child: QubeStoreList(
+            highlightId: '184220913',
+            onConnect: (_) {},
+            groups: const [
+              QubeStoreGroup('Москва — Тверская', [
+                QubeStoreComputer(id: '184220913', name: 'Касса', platform: 'Windows', online: true),
+                QubeStoreComputer(id: '93004117', name: 'Ноутбук управляющего', platform: 'Mac OS', online: true),
+                QubeStoreComputer(id: '71553820', name: 'Экран в зале', platform: 'Windows', online: false),
+              ]),
+              QubeStoreGroup('Удаленная работа', [
+                QubeStoreComputer(id: '298564440', name: 'Руслан Камалов · win-81v5958fiu3', platform: 'Windows', online: true),
+                QubeStoreComputer(id: '69983058', name: 'Эдуард Катрич · macbook-air', platform: 'Mac OS', online: true),
+              ]),
+              QubeStoreGroup('Фабрика — цех', [
+                QubeStoreComputer(id: '120664015', name: 'Мастер участка покраски', platform: 'Windows', online: false),
+              ]),
+            ],
+          ),
+        ),
+      ],
+    );
+
+Widget _helpBody() => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const QubeHeader('Помощь',
+            subtitle: 'Что-то не работает — позовите специалиста, он подключится к этому компьютеру'),
+        const SizedBox(height: 18),
+        QubeHelpView(
+          onSend: (_, __) async => null,
+          targets: const [
+            QubeHelpTarget('support', 'Поддержка фабрики', 'ИТ отвечает в рабочее время'),
+            QubeHelpTarget('manager', 'Управляющий точкой', 'Ольга Ким · Москва — Тверская'),
+          ],
+        ),
+      ],
+    );
+
+Widget _screen(Brightness b, {bool stores = false, bool help = false, bool waiting = false, bool invite = false}) {
   final dark = b == Brightness.dark;
   final mut = (dark ? Colors.white : Colors.black).withOpacity(0.55);
   Widget field(String hint) => Container(
@@ -96,7 +143,7 @@ Widget _screen(Brightness b) {
         scaffoldBackgroundColor: Colors.transparent),
     home: Material(
       color: Colors.transparent,
-      child: QubeBackdrop(
+      child: Stack(fit: StackFit.expand, children: [QubeBackdrop(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -105,9 +152,19 @@ Widget _screen(Brightness b) {
               QubeSideItem(
                   icon: Icons.screen_share_outlined,
                   label: 'Подключиться',
-                  selected: true,
+                  selected: !stores && !help,
+                  onTap: () {}),
+              QubeSideItem(
+                  icon: Icons.support_outlined,
+                  label: 'Помощь',
+                  selected: help,
                   onTap: () {}),
               const QubeSideLabel('Компьютеры'),
+              QubeSideItem(
+                  icon: Icons.storefront_outlined,
+                  label: 'Подразделения',
+                  selected: stores,
+                  onTap: () {}),
               QubeSideItem(
                   icon: Icons.history_rounded, label: 'Недавние', onTap: () {}),
               QubeSideItem(
@@ -122,6 +179,12 @@ Widget _screen(Brightness b) {
                   label: 'Доступ и пароль',
                   onTap: () {}),
               const Spacer(),
+              if (waiting)
+                QubeUpdateCard(
+                    label: 'q7',
+                    notes: 'Подразделения по точкам, «Помощь» и «Позвать ещё человека»',
+                    onUpdate: () {}),
+              const SizedBox(height: 8),
               QubeSideItem(
                   icon: Icons.settings_outlined,
                   label: 'Настройки',
@@ -150,7 +213,7 @@ Widget _screen(Brightness b) {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(28, 22, 28, 20),
-                child: Column(
+                child: help ? _helpBody() : stores ? _storesBody() : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const QubeHeader('Подключиться',
@@ -277,6 +340,24 @@ Widget _screen(Brightness b) {
                         ],
                       ),
                     ),
+                    if (waiting) ...[
+                      const SizedBox(height: 22),
+                      Text('Ждут помощи', style: qubeTitle(19)),
+                      const SizedBox(height: 10),
+                      QubeWaitRow(
+                          icon: Icons.group_add_outlined,
+                          title: 'Сергей Иванов зовёт посмотреть',
+                          sub: 'Касса · Москва — Тверская',
+                          when: '2 мин',
+                          actions: const [QubeButton(label: 'Присоединиться', height: 36)]),
+                      QubeWaitRow(
+                          icon: Icons.support_outlined,
+                          title: 'Анна Смирнова · Касса, Москва — Тверская',
+                          sub: '«Не печатается чек, принтер пишет „нет бумаги“»',
+                          when: '4 мин',
+                          actions: const [QubeButton(label: 'Взять', height: 36)]),
+                    ],
+                    if (!waiting) ...[
                     const SizedBox(height: 22),
                     Text('Недавние', style: qubeTitle(19)),
                     const SizedBox(height: 10),
@@ -292,6 +373,7 @@ Widget _screen(Brightness b) {
                           'Цех, мастер участка покраски', '58 771 302', false,
                           '3 дня назад'),
                     ]),
+                    ],
                   ],
                 ),
               ),
@@ -299,6 +381,24 @@ Widget _screen(Brightness b) {
           ],
         ),
       ),
+      if (invite) ...[
+        Container(color: Colors.black.withOpacity(0.45)),
+        Center(
+          child: QubeInviteView(
+            autofocus: false,
+            viewOnly: true,
+            onViewOnly: (_) {},
+            onSearch: (_) {},
+            onPick: (_) {},
+            people: const [
+              {'name': 'Ольга Ким', 'sub': 'Управляющая · Москва — Тверская'},
+              {'name': 'Ольга Петрова', 'sub': 'Бухгалтер · Фабрика'},
+              {'name': 'Олег Смирнов', 'sub': 'ИТ-поддержка · Двери Юга'},
+            ],
+          ),
+        ),
+      ],
+    ]),
     ),
   );
 }
@@ -316,13 +416,15 @@ void main() {
     await _font('MaterialIcons',
         ['$sdk/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf']);
   });
+  for (final page in ['home', 'stores', 'help', 'waiting', 'invite'])
   for (final b in Brightness.values) {
-    testWidgets('qubeDesk ${b.name}', (t) async {
+    final stores = page == 'stores', help = page == 'help', waiting = page == 'waiting' || page == 'invite', invite = page == 'invite';
+    testWidgets('qubeDesk ${b.name} $page', (t) async {
       t.view.physicalSize = const Size(2200, 1400);
       t.view.devicePixelRatio = 2;
       // в тестах тени по умолчанию плоские — на время снимка включаем настоящие
       debugDisableShadows = false;
-      await t.pumpWidget(_screen(b));
+      await t.pumpWidget(_screen(b, stores: stores, help: help, waiting: waiting, invite: invite));
       // картинки в тесте грузятся отдельно — дожидаемся значка, иначе пусто
       await t.runAsync(() async {
         for (final e in find.byType(Image).evaluate()) {
@@ -331,7 +433,7 @@ void main() {
       });
       await t.pumpAndSettle();
       await expectLater(
-          find.byType(MaterialApp), matchesGoldenFile('preview_${b.name}.png'));
+          find.byType(MaterialApp), matchesGoldenFile(page == 'home' ? 'preview_${b.name}.png' : 'preview_${page}_${b.name}.png'));
       debugDisableShadows = true;
     });
   }

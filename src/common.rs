@@ -2486,7 +2486,7 @@ pub fn qd_check_grant(
             return None;
         }
         let mode = parts[2];
-        if mode != "auto" && mode != "confirm" {
+        if !["auto", "confirm", "auto-view", "confirm-view"].contains(&mode) {
             return None;
         }
         Some(format!("{mode}\n{}", parts[4]))

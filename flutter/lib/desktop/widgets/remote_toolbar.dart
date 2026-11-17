@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../common/widgets/qube_live.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -847,6 +848,16 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
       toolbarItems.add(_KeyboardMenu(id: widget.id, ffi: widget.ffi));
     }
     toolbarItems.add(_ChatMenu(id: widget.id, ffi: widget.ffi));
+    // qubeDesk: позвать ещё человека к этому экрану (сисадмин зовёт управляющую)
+    if (qubeLoggedIn()) {
+      toolbarItems.add(_IconMenuButton(
+        icon: const Icon(Icons.group_add_outlined, color: Colors.white, size: 18),
+        tooltip: 'Позвать ещё человека',
+        color: _ToolbarTheme.blueColor,
+        hoverColor: _ToolbarTheme.hoverBlueColor,
+        onPressed: () => showQubeInvite(context, widget.id),
+      ));
+    }
     if (!isWeb) {
       toolbarItems.add(_VoiceCallMenu(id: widget.id, ffi: widget.ffi));
     }

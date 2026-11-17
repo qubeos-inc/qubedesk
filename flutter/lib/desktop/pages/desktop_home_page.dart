@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../common/widgets/qube_live.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -61,7 +62,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   /// 2 — «Избранное», 3 — «В этой сети», 4 — «Подразделения».
   /// Это вкладки RustDesk, только выбираются слева.
   final RxInt _section = 0.obs;
-  static const _tabOf = [0, 0, 1, 2, 4];
+  static const _tabOf = [0, 0, 1, 2, 4, 0];
 
   void _select(int s) {
     _section.value = s;
@@ -118,6 +119,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     return QubeSidebar(children: [
       const QubeBrand(),
       item(0, Icons.screen_share_outlined, 'Подключиться'),
+      item(5, Icons.support_outlined, 'Помощь'),
       const QubeSideLabel('Компьютеры'),
       Obx(() => gFFI.userModel.isLogin
           ? QubeSideItem(
@@ -145,6 +147,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             children: [
               if (!isOutgoingOnly) buildPresetPasswordWarning(),
               Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
+              // Новая версия qubeDesk — скачивается и ставится отсюда
+              const QubeUpdateBanner(),
             ],
           ),
         ),

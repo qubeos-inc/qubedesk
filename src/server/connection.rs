@@ -2243,6 +2243,17 @@ impl Connection {
                 self.try_sub_monitor_services();
             }
         }
+        // qubeDesk: позвали «только смотреть» — мышь, клавиатура и буфер для гостя выключены
+        if self
+            .qd_grant()
+            .map(|g| g.0.ends_with("-view"))
+            .unwrap_or(false)
+        {
+            self.keyboard = false;
+            self.send_permission(Permission::Keyboard, false).await;
+            self.clipboard = false;
+            self.send_permission(Permission::Clipboard, false).await;
+        }
         true
     }
 
@@ -3054,7 +3065,7 @@ impl Connection {
             // к личному — без пароля, но сотрудник нажимает «Принять» в окне qubeDesk.
             if let Some((mode, who)) = self.qd_grant() {
                 let name = format!("{who} · qubeOS");
-                if mode == "auto" {
+                if mode.starts_with("auto") {
                     if !self.send_logon_response_and_keep_alive().await {
                         return false;
                     }
