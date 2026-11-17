@@ -59,21 +59,19 @@ class QubeStoresLive extends StatefulWidget {
   State<QubeStoresLive> createState() => _QubeStoresLiveState();
 }
 
+/// Данные берём прямо из qubeOS (stores-view): точки, компьютеры, кто на них
+/// работает, на связи ли и кто помогает. Раньше группы собирались из списка
+/// RustDesk, и название точки по дороге терялось — всё падало в «Без точки».
 class _QubeStoresLiveState extends State<QubeStoresLive> {
+  List<QubeStoreGroup>? _groups;
+  String? _error;
   Timer? _t;
 
   @override
   void initState() {
     super.initState();
-    gFFI.groupModel.pull(force: true);
-    // связь компьютеров узнаём у сервера раз в полминуты, пока экран открыт
-    _query();
-    _t = Timer.periodic(const Duration(seconds: 30), (_) => _query());
-  }
-
-  void _query() {
-    final ids = gFFI.groupModel.peers.map((p) => p.id).toList();
-    if (ids.isNotEmpty) bind.queryOnlines(ids: ids);
+    _load();
+    _t = Timer.periodic(const Duration(seconds: 30), (_) => _load());
   }
 
   @override
@@ -82,32 +80,50 @@ class _QubeStoresLiveState extends State<QubeStoresLive> {
     super.dispose();
   }
 
+  Future<void> _load() async {
+    try {
+      final list = await qubeApi('stores-view') as List;
+      final groups = [
+        for (final g in list)
+          QubeStoreGroup(
+            '${g['name']}',
+            [
+              for (final c in (g['computers'] as List))
+                QubeStoreComputer(
+                  id: '${c['id']}',
+                  name: '${c['name']}',
+                  platform: '${c['os'] ?? ''}',
+                  online: c['online'] == true,
+                  person: c['person'] as String?,
+                ),
+            ],
+            helper: g['helper'] == null
+                ? null
+                : ('${g['helper']['names']}'.isEmpty
+                    ? '${g['helper']['title']}'
+                    : '${g['helper']['title']}' == 'Поддержка фабрики'
+                        ? 'Поддержка фабрики'
+                        : '${g['helper']['names']} · ${'${g['helper']['title']}'.toLowerCase()}'),
+          ),
+      ];
+      if (mounted) setState(() { _groups = groups; _error = null; });
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<Peers>.value(
-      value: gFFI.groupModel.peersModel,
-      child: Consumer<Peers>(builder: (context, model, _) {
-        final byStore = <String, List<QubeStoreComputer>>{};
-        for (final p in model.peers) {
-          final name = p.alias.isNotEmpty
-              ? p.alias
-              : (p.note.isNotEmpty ? p.note : p.hostname);
-          (byStore[p.device_group_name.isEmpty
-                  ? 'Без точки'
-                  : p.device_group_name] ??= [])
-              .add(QubeStoreComputer(
-                  id: p.id,
-                  name: name.isEmpty ? 'Компьютер' : name,
-                  platform: p.platform,
-                  online: p.online));
-        }
-        final names = byStore.keys.toList()..sort();
-        return QubeStoreList(
-          groups: [for (final n in names) QubeStoreGroup(n, byStore[n]!)],
-          emptyText: 'Компьютеров точек пока нет — их добавляют в карточке подразделения в qubeOS',
-          onConnect: (c) => connect(context, c.id),
-        );
-      }),
+    if (_groups == null) {
+      return Center(
+          child: _error == null
+              ? const CircularProgressIndicator(color: qubePink)
+              : Text(_error!, style: const TextStyle(fontSize: 14)));
+    }
+    return QubeStoreList(
+      groups: _groups!,
+      emptyText: 'Компьютеров точек пока нет — их добавляют в карточке подразделения в qubeOS',
+      onConnect: (c) => connect(context, c.id),
     );
   }
 }
@@ -372,7 +388,7 @@ class _QubeInviteBodyState extends State<QubeInviteBody> {
 
 /// Номер этой сборки (q7, q8 …). qubeOS сообщает номер последней; больше —
 /// значит, вышла новая версия. Поднимается к каждому выпуску.
-const int qubeBuild = 6;
+const int qubeBuild = 7;
 
 /// Плашка «Вышла новая версия» в боковой панели: скачивает установщик сама
 /// и открывает его — ходить на GitHub не нужно.
@@ -414,7 +430,9 @@ class _QubeUpdateBannerState extends State<QubeUpdateBanner> {
 
   Future<void> _update() async {
     final l = _latest!;
-    final url = '${Platform.isWindows ? l['windows'] : l['mac'] ?? ''}';
+    // Mac на Apple и на Intel — разные установщики: берём под свой процессор
+    final arm = Platform.version.contains('arm64');
+    final url = '${Platform.isWindows ? l['windows'] : (arm ? l['macArm'] : l['macIntel']) ?? l['mac'] ?? ''}';
     if (url.isEmpty || !url.startsWith('https://')) {
       showToast('Для этой системы новой версии пока нет');
       return;

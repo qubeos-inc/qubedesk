@@ -11,17 +11,22 @@ class QubeStoreComputer {
   final String name;
   final String platform;
   final bool online;
+  /// Кто на нём работает — последний вошедший через qubeOS
+  final String? person;
   const QubeStoreComputer(
       {required this.id,
       required this.name,
       required this.platform,
-      required this.online});
+      required this.online,
+      this.person});
 }
 
 class QubeStoreGroup {
   final String name;
   final List<QubeStoreComputer> computers;
-  const QubeStoreGroup(this.name, this.computers);
+  /// Кому сейчас уходят заявки «Помощи» с этой точки: «ИТ компании · Сергей Иванов»
+  final String? helper;
+  const QubeStoreGroup(this.name, this.computers, {this.helper});
 }
 
 /// Номер группами по три — так его диктуют: 298 564 440
@@ -88,9 +93,10 @@ class _QubeStoreListState extends State<QubeStoreList> {
           : g.computers
               .where((c) =>
                   c.name.toLowerCase().contains(q) ||
+                  (c.person ?? '').toLowerCase().contains(q) ||
                   c.id.contains(q.replaceAll(' ', '')))
               .toList();
-      if (list.isNotEmpty) groups.add(QubeStoreGroup(g.name, list));
+      if (list.isNotEmpty) groups.add(QubeStoreGroup(g.name, list, helper: g.helper));
     }
 
     final search = SizedBox(
@@ -100,7 +106,7 @@ class _QubeStoreListState extends State<QubeStoreList> {
         style: const TextStyle(fontSize: 14),
         decoration: InputDecoration(
           isDense: true,
-          hintText: 'Точка, компьютер или номер',
+          hintText: 'Точка, компьютер, сотрудник или номер',
           hintStyle: TextStyle(fontSize: 14, color: mut),
           prefixIcon: Icon(Icons.search_rounded, size: 19, color: mut),
           prefixIconConstraints: const BoxConstraints(minWidth: 40),
@@ -158,7 +164,9 @@ class _GroupHeader extends StatelessWidget {
       child: Row(children: [
         const Icon(Icons.storefront_outlined, size: 19, color: qubePink),
         const SizedBox(width: 9),
-        Flexible(
+        // Название — главное: целиком, сокращается только совсем длинное
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
           child: Text(g.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -170,6 +178,21 @@ class _GroupHeader extends StatelessWidget {
             maxLines: 1,
             softWrap: false,
             style: TextStyle(fontSize: 12.5, color: mut)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: g.helper == null
+              ? const SizedBox.shrink()
+              : Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              const Icon(Icons.support_outlined, size: 15, color: qubePink),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text('Помогает: ${g.helper}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, color: mut)),
+              ),
+            ]),
+        ),
       ]),
     );
   }
@@ -220,11 +243,22 @@ class _RowState extends State<_Row> {
             ),
             const SizedBox(width: 14),
             Expanded(
-              child: Text(c.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 14.5, fontWeight: FontWeight.w500)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(c.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14.5, fontWeight: FontWeight.w500)),
+                  if (c.person != null && c.person!.isNotEmpty)
+                    Text(c.person!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: widget.mut)),
+                ],
+              ),
             ),
             SizedBox(
               width: 116,

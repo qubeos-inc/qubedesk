@@ -31,17 +31,17 @@ Widget _storesBody() => Column(
             onConnect: (_) {},
             groups: const [
               QubeStoreGroup('Москва — Тверская', [
-                QubeStoreComputer(id: '184220913', name: 'Касса', platform: 'Windows', online: true),
-                QubeStoreComputer(id: '93004117', name: 'Ноутбук управляющего', platform: 'Mac OS', online: true),
+                QubeStoreComputer(id: '184220913', name: 'Касса', platform: 'Windows', online: true, person: 'Анна Смирнова'),
+                QubeStoreComputer(id: '93004117', name: 'Ноутбук управляющего', platform: 'Mac OS', online: true, person: 'Ольга Ким'),
                 QubeStoreComputer(id: '71553820', name: 'Экран в зале', platform: 'Windows', online: false),
-              ]),
+              ], helper: 'Ольга Ким, управляющая'),
               QubeStoreGroup('Удаленная работа', [
-                QubeStoreComputer(id: '298564440', name: 'Руслан Камалов · win-81v5958fiu3', platform: 'Windows', online: true),
-                QubeStoreComputer(id: '69983058', name: 'Эдуард Катрич · macbook-air', platform: 'Mac OS', online: true),
-              ]),
+                QubeStoreComputer(id: '298564440', name: 'win-81v5958fiu3', platform: 'Windows', online: true, person: 'Руслан Камалов'),
+                QubeStoreComputer(id: '69983058', name: 'macbook-air', platform: 'Mac OS', online: true, person: 'Эдуард Катрич'),
+              ], helper: 'Поддержка фабрики'),
               QubeStoreGroup('Фабрика — цех', [
-                QubeStoreComputer(id: '120664015', name: 'Мастер участка покраски', platform: 'Windows', online: false),
-              ]),
+                QubeStoreComputer(id: '120664015', name: 'Мастер участка покраски', platform: 'Windows', online: false, person: 'Игорь Белов'),
+              ], helper: 'Сергей Иванов, ИТ'),
             ],
           ),
         ),
