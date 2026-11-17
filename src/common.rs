@@ -2304,12 +2304,6 @@ async fn secure_tcp_impl(conn: &mut Stream, key: &str, log_on_success: bool) -> 
 /// when the server sent something else first, nothing parseable, or closed: `secure_tcp`
 /// tolerates that for servers from before the exchange, `secure_tcp_required` does not.
 async fn key_exchange(conn: &mut Stream, key: &str, log_on_success: bool) -> ResultType<bool> {
-    // qubeDesk: наш сервер — открытая версия hbbs, обмена ключами на TCP у неё нет. Она молчит,
-    // и программа после входа через qubeOS ждала 18 секунд и падала «Failed to secure tcp».
-    // Говорим «сервер без обмена» сразу: secure_tcp это терпит, а WebRTC уходит в обычный путь.
-    if !QUBEDESK_SERVER_KX {
-        return Ok(false);
-    }
     let rs_pk = get_rs_pk(key);
     let Some(rs_pk) = rs_pk else {
         bail!("Handshake failed: invalid public key from rendezvous server");
@@ -2516,8 +2510,6 @@ pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
 /// скрыты — приложение ходит только на сервер qubeOS. Проверка обновлений
 /// RustDesk выключена: обновления приходят от нас.
 const QUBEDESK_SERVER: &str = "qubeos.ru";
-/// Делает ли наш сервер обмен ключами на TCP (открытая версия hbbs — нет)
-const QUBEDESK_SERVER_KX: bool = false;
 const QUBEDESK_API: &str = "https://qubeos.ru/api/qubedesk";
 
 fn apply_qubedesk() {

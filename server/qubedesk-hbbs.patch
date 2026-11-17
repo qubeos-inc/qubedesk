@@ -1,0 +1,230 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 8da29a2..6af6d9b 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,3 +1,4 @@
++mod qubedesk;
+ mod rendezvous_server;
+ pub use rendezvous_server::*;
+ pub mod common;
+diff --git a/src/qubedesk.rs b/src/qubedesk.rs
+new file mode 100644
+index 0000000..37b1ce4
+--- /dev/null
++++ b/src/qubedesk.rs
+@@ -0,0 +1,117 @@
++//! qubeDesk: что наш сервер делает сверх открытой версии.
++//!
++//! 1. Обмен ключами на TCP — тот, что программа ждёт после входа через qubeOS:
++//!    сервер первым шлёт свой временный ключ, подписанный ключом сервера,
++//!    программа отвечает симметричным ключом, запечатанным для него. Дальше
++//!    канал шифруется (схема «версия 0»: один ключ, счётчики в нонсе).
++//! 2. Проверка прав: пропуск (токен) из запроса на подключение уходит в qubeOS,
++//!    и та говорит, можно ли этому человеку к этому компьютеру.
++use hbb_common::{
++    bytes::{Bytes, BytesMut},
++    bytes_codec::BytesCodec,
++    futures_util::{SinkExt, StreamExt},
++    log,
++    protobuf::Message as _,
++    rendezvous_proto::*,
++    tcp::Encrypt,
++    timeout,
++    tokio::net::TcpStream,
++    tokio_util::codec::Framed,
++    ResultType,
++};
++use once_cell::sync::Lazy;
++use sodiumoxide::crypto::{box_, sign};
++use std::{
++    collections::HashMap,
++    sync::{Arc, Mutex},
++    time::{Duration, Instant},
++};
++
++pub type SharedEncrypt = Arc<Mutex<Encrypt>>;
++
++/// Чем закончилось начало разговора с программой.
++pub enum Kx {
++    /// Программа прислала ключ — канал дальше зашифрован.
++    Secured(SharedEncrypt),
++    /// Программа сразу заговорила открыто (старые версии, без входа) — это её первое сообщение.
++    Plain(BytesMut),
++    /// Ничего не прислала.
++    Closed,
++}
++
++pub async fn server_kx(framed: &mut Framed<TcpStream, BytesCodec>, sk: &sign::SecretKey) -> ResultType<Kx> {
++    let (our_pk, our_sk) = box_::gen_keypair();
++    let mut msg = RendezvousMessage::new();
++    msg.set_key_exchange(KeyExchange {
++        keys: vec![sign::sign(&our_pk.0, sk).into()],
++        ..Default::default()
++    });
++    framed.send(Bytes::from(msg.write_to_bytes()?)).await?;
++    let bytes = match timeout(30_000, framed.next()).await {
++        Ok(Some(Ok(b))) => b,
++        _ => return Ok(Kx::Closed),
++    };
++    if let Ok(m) = RendezvousMessage::parse_from_bytes(&bytes) {
++        if let Some(rendezvous_message::Union::KeyExchange(ex)) = m.union {
++            if ex.keys.len() != 2 {
++                hbb_common::bail!("неверный ответ на обмен ключами");
++            }
++            let key = Encrypt::decode(&ex.keys[1], &ex.keys[0], &our_sk)?;
++            return Ok(Kx::Secured(Arc::new(Mutex::new(Encrypt::new(key)))));
++        }
++    }
++    Ok(Kx::Plain(bytes))
++}
++
++// ── Проверка прав в qubeOS ─────────────────────────────────────────────
++
++static HTTP: Lazy<reqwest::Client> = Lazy::new(|| {
++    reqwest::Client::builder()
++        .timeout(Duration::from_secs(3))
++        .build()
++        .unwrap_or_default()
++});
++
++/// Решения помним минуту: один заход программы — это несколько запросов подряд.
++static CACHE: Lazy<Mutex<HashMap<(String, String), (Instant, Option<String>)>>> =
++    Lazy::new(Default::default);
++
++/// `None` — пускаем, `Some(причина)` — нет. Если qubeOS не ответила, пускаем:
++/// пароль на том компьютере всё равно спросят, а помощь не должна вставать.
++pub async fn access(token: &str, id: &str, ip: &str) -> Option<String> {
++    if token.is_empty() {
++        return None;
++    }
++    let (Ok(url), Ok(secret)) = (std::env::var("QUBEDESK_ACCESS_URL"), std::env::var("QUBEDESK_SECRET")) else {
++        return None;
++    };
++    let k = (token.to_owned(), id.to_owned());
++    if let Some((at, r)) = CACHE.lock().unwrap().get(&k) {
++        if at.elapsed() < Duration::from_secs(60) {
++            return r.clone();
++        }
++    }
++    let body = serde_json::json!({ "token": token, "id": id, "ip": ip });
++    let r = match HTTP.post(&url).header("x-qd-secret", secret).json(&body).send().await {
++        Ok(res) if res.status().is_success() => match res.json::<serde_json::Value>().await {
++            Ok(v) if v["allow"].as_bool() == Some(false) => Some(
++                v["reason"].as_str().unwrap_or("Нет доступа к этому компьютеру").to_owned(),
++            ),
++            _ => None,
++        },
++        Ok(res) => {
++            log::warn!("qubeOS ответила {} на проверку доступа", res.status());
++            None
++        }
++        Err(e) => {
++            log::warn!("qubeOS не ответила на проверку доступа: {e}");
++            None
++        }
++    };
++    let mut c = CACHE.lock().unwrap();
++    if c.len() > 5000 {
++        c.clear();
++    }
++    c.insert(k, (Instant::now(), r.clone()));
++    r
++}
+diff --git a/src/rendezvous_server.rs b/src/rendezvous_server.rs
+index 84c0293..d15f3c5 100644
+--- a/src/rendezvous_server.rs
++++ b/src/rendezvous_server.rs
+@@ -51,7 +51,8 @@ const REG_TIMEOUT: i64 = 30_000;
+ type TcpStreamSink = SplitSink<Framed<TcpStream, BytesCodec>, Bytes>;
+ type WsSink = SplitSink<tokio_tungstenite::WebSocketStream<TcpStream>, tungstenite::Message>;
+ enum Sink {
+-    TcpStream(TcpStreamSink),
++    /// Второе поле — шифрование канала, если программа прошла обмен ключами (qubeDesk)
++    TcpStream(TcpStreamSink, Option<crate::qubedesk::SharedEncrypt>),
+     Ws(WsSink),
+ }
+ type Sender = mpsc::UnboundedSender<Data>;
+@@ -572,6 +573,19 @@ impl RendezvousServer {
+         if let Ok(msg_in) = RendezvousMessage::parse_from_bytes(bytes) {
+             match msg_in.union {
+                 Some(rendezvous_message::Union::PunchHoleRequest(ph)) => {
++                    // qubeDesk: можно ли этому человеку к этому компьютеру — решает qubeOS
++                    if let Some(reason) =
++                        crate::qubedesk::access(&ph.token, &ph.id, &addr.ip().to_string()).await
++                    {
++                        log::info!("qubeDesk: не пустили {addr} к {}: {reason}", ph.id);
++                        let mut msg_out = RendezvousMessage::new();
++                        msg_out.set_punch_hole_response(PunchHoleResponse {
++                            other_failure: reason,
++                            ..Default::default()
++                        });
++                        Self::send_to_sink(sink, msg_out).await;
++                        return false;
++                    }
+                     // there maybe several attempt, so sink can be none
+                     if let Some(sink) = sink.take() {
+                         self.tcp_punch.lock().await.insert(try_into_v4(addr), sink);
+@@ -587,6 +601,12 @@ impl RendezvousServer {
+                         );
+                         return false;
+                     }
++                    if crate::qubedesk::access(&rf.token, &rf.id, &addr.ip().to_string())
++                        .await
++                        .is_some()
++                    {
++                        return false;
++                    }
+                     // there maybe several attempt, so sink can be none
+                     if let Some(sink) = sink.take() {
+                         self.tcp_punch.lock().await.insert(try_into_v4(addr), sink);
+@@ -918,7 +938,11 @@ impl RendezvousServer {
+         if let Some(sink) = sink.as_mut() {
+             if let Ok(bytes) = msg.write_to_bytes() {
+                 match sink {
+-                    Sink::TcpStream(s) => {
++                    Sink::TcpStream(s, enc) => {
++                        let bytes = match enc {
++                            Some(e) => e.lock().unwrap().enc(&bytes),
++                            None => bytes,
++                        };
+                         allow_err!(s.send(Bytes::from(bytes)).await);
+                     }
+                     Sink::Ws(ws) => {
+@@ -1298,11 +1322,33 @@ impl RendezvousServer {
+         } else {
+             let mut framed = Framed::new(stream, BytesCodec::new());
+             framed.codec_mut().set_max_packet_length(*MAX_MESSAGE);
++            // qubeDesk: сначала обмен ключами, как у платного сервера
++            let mut enc = None;
++            let mut first = None;
++            if let Some(sk) = self.inner.sk.as_ref() {
++                match crate::qubedesk::server_kx(&mut framed, sk).await? {
++                    crate::qubedesk::Kx::Secured(e) => enc = Some(e),
++                    crate::qubedesk::Kx::Plain(b) => first = Some(b),
++                    crate::qubedesk::Kx::Closed => return Ok(()),
++                }
++            }
+             let (a, mut b) = framed.split();
+-            sink = Some(Sink::TcpStream(a));
+-            while let Ok(Some(Ok(bytes))) = timeout(30_000, b.next()).await {
+-                if !self.handle_tcp(&bytes, &mut sink, addr, key, ws).await {
+-                    break;
++            sink = Some(Sink::TcpStream(a, enc.clone()));
++            let go_on = match first {
++                Some(bytes) => self.handle_tcp(&bytes, &mut sink, addr, key, ws).await,
++                None => true,
++            };
++            if go_on {
++                while let Ok(Some(Ok(mut bytes))) = timeout(30_000, b.next()).await {
++                    if let Some(e) = enc.as_ref() {
++                        if e.lock().unwrap().dec(&mut bytes).is_err() {
++                            log::warn!("Не расшифровали сообщение от {addr}");
++                            break;
++                        }
++                    }
++                    if !self.handle_tcp(&bytes, &mut sink, addr, key, ws).await {
++                        break;
++                    }
+                 }
+             }
+         }
