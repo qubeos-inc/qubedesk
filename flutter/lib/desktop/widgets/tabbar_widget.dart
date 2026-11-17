@@ -1165,13 +1165,17 @@ class _TabState extends State<_Tab> with RestorationMixin {
         onTap: () => widget.onTap(),
         // qubeDesk: выбранная вкладка — розовая «таблетка», как в qubeOS
         child: Container(
-            child: Obx(() => Container(
+            // hover читаем всегда: Obx без наблюдаемых значений падает
+            // (в сборке — серый прямоугольник вместо вкладок)
+            child: Obx(() {
+              final hovered = hover.value;
+              return Container(
               margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
                 color: isSelected
                     ? const Color(0xFFF747A2).withOpacity(0.16)
-                    : hover.value
+                    : hovered
                         ? Colors.grey.withOpacity(0.12)
                         : Colors.transparent,
               ),
@@ -1195,7 +1199,8 @@ class _TabState extends State<_Tab> with RestorationMixin {
                           ])).paddingOnly(left: 10, right: 5),
                 ],
               ),
-            ))),
+            );
+            })),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_hbb/common/widgets/qube_glass.dart';
+import 'package:flutter_hbb/common/widgets/qube_live.dart' show qubeBuild;
 import 'dart:convert';
 import 'dart:io';
 
@@ -2619,7 +2620,7 @@ class _AboutState extends State<_About> {
                 height: 8.0,
               ),
               SelectionArea(
-                  child: Text('${translate('Version')}: $version')
+                  child: Text('${translate('Version')}: $version · сборка q$qubeBuild')
                       .marginSymmetric(vertical: 4.0)),
               SelectionArea(
                   child: Text('${translate('Build Date')}: $buildDate')
@@ -2647,10 +2648,16 @@ class _AboutState extends State<_About> {
                     translate('Website'),
                     style: linkStyle,
                   ).marginSymmetric(vertical: 4.0)),
+              // qubeDesk: плашка в цветах qubeOS; уведомление об авторских
+              // правах RustDesk сохраняем — этого требует лицензия AGPL
               Container(
-                decoration: const BoxDecoration(color: Color(0xFF2c8cff)),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                      colors: [Color(0xFFF747A2), Color(0xFFED99BB)]),
+                ),
                 padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 8),
+                    const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
                 child: SelectionArea(
                     child: Row(
                   children: [
@@ -2663,7 +2670,7 @@ class _AboutState extends State<_About> {
                             style: const TextStyle(color: Colors.white),
                           ),
                           Text(
-                            translate('Slogan_tip'),
+                            'qubeDesk для qubeOS · на основе RustDesk',
                             style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white),

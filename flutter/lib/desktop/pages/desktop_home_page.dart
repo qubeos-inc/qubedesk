@@ -149,6 +149,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               Obx(() => buildHelpCards(stateGlobal.updateUrl.value)),
               // Новая версия qubeDesk — скачивается и ставится отсюда
               const QubeUpdateBanner(),
+              // Какая сборка стоит — видно сразу, без захода в настройки
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('qubeDesk 1.5.3 · сборка q$qubeBuild',
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        color: (Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white
+                                : Colors.black)
+                            .withOpacity(0.45))),
+              ),
             ],
           ),
         ),

@@ -472,7 +472,10 @@ class _CmHeaderState extends State<_CmHeader>
                 : client.portForward.isNotEmpty
                     ? 'туннель ${client.portForward}'
                     : null;
-    return Obx(() => QubeClientHeader(
+    return Obx(() {
+      // _time читаем всегда: Obx без наблюдаемых значений падает
+      final secs = _time.value;
+      return QubeClientHeader(
           name: client.name,
           peerId: client.peerId,
           kind: kind,
@@ -480,7 +483,7 @@ class _CmHeaderState extends State<_CmHeader>
           status: client.authorized
               ? client.disconnected
                   ? 'Отключено'
-                  : 'Подключено · ${formatDurationToTime(Duration(seconds: _time.value))}'
+                  : 'Подключено · ${formatDurationToTime(Duration(seconds: secs))}'
               : 'Хочет подключиться к экрану',
           onChat: chat
               ? () => checkClickTime(client.id, () {
@@ -492,7 +495,8 @@ class _CmHeaderState extends State<_CmHeader>
                     }
                   })
               : null,
-        ).marginSymmetric(horizontal: 5, vertical: 10));
+        ).marginSymmetric(horizontal: 5, vertical: 10);
+    });
   }
 
   @override
