@@ -100,8 +100,34 @@ wf_arm = {
     'jobs': {'generate-bridge': copy.deepcopy(bridge), 'build-for-macOS': arm},
 }
 
+# Сборка на своём Mac с Apple M1–M4 (помощник GitHub на компьютере владельца).
+# Там нет sudo без пароля и wget, CocoaPods может не быть — шаги под это поправлены.
+own = copy.deepcopy(arm)
+own['runs-on'] = ['self-hosted', 'macOS', 'ARM64']
+own['strategy']['matrix']['job'] = [{k: v for k, v in m.items() if k != 'os'} for m in arm['strategy']['matrix']['job']]
+own['timeout-minutes'] = 360
+for st in own['steps']:
+    if st.get('name') == 'Install NASM':
+        st['run'] = ('set -e\nD="$RUNNER_TEMP/nasm"; rm -rf "$D"; mkdir -p "$D"; cd "$D"\n'
+                     'curl -fsSLO https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip\n'
+                     'unzip -q nasm-2.16.03-macosx.zip\necho "$D/nasm-2.16.03" >> "$GITHUB_PATH"\n'
+                     '"$D/nasm-2.16.03/nasm" --version || echo "NASM не запустился (нет Rosetta) — для arm64 он не нужен"\n')
+assert any(st.get('name') == 'Install NASM' for st in own['steps'])
+own['steps'].insert(0, {'name': 'qubeDesk: проверить Mac', 'shell': 'bash', 'run':
+    'set -e\ncommand -v brew >/dev/null || { echo "Нужен Homebrew: https://brew.sh"; exit 1; }\n'
+    'xcodebuild -version || { echo "Нужен Xcode из App Store и: sudo xcode-select -s /Applications/Xcode.app"; exit 1; }\n'
+    'command -v pod >/dev/null || brew install cocoapods\ncommand -v python3\ndf -h "$GITHUB_WORKSPACE" | tail -1\n'})
+wf_own = {
+    'name': 'Сборка qubeDesk — на своём Mac',
+    'on': {'workflow_dispatch': {'inputs': {
+        'upload-artifact': {'type': 'boolean', 'default': True, 'description': 'Собрать установщик'}}}},
+    'env': env,
+    'jobs': {'generate-bridge': copy.deepcopy(bridge), 'build-for-macOS': own},
+}
+
 head = '# Создано .github/scripts/make-qubedesk-workflow.py — правьте сценарий, а не этот файл\n'
 out = yaml.safe_dump(wf, allow_unicode=True, sort_keys=False, width=1000)
 (root / 'workflows/qubedesk.yml').write_text(head + out)
 (root / 'workflows/qubedesk-mac-arm.yml').write_text(head + yaml.safe_dump(wf_arm, allow_unicode=True, sort_keys=False, width=1000))
+(root / 'workflows/qubedesk-mac-own.yml').write_text(head + yaml.safe_dump(wf_own, allow_unicode=True, sort_keys=False, width=1000))
 print('готово:', root / 'workflows/qubedesk.yml', root / 'workflows/qubedesk-mac-arm.yml')
