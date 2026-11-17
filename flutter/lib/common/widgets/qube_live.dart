@@ -388,7 +388,7 @@ class _QubeInviteBodyState extends State<QubeInviteBody> {
 
 /// Номер этой сборки (q7, q8 …). qubeOS сообщает номер последней; больше —
 /// значит, вышла новая версия. Поднимается к каждому выпуску.
-const int qubeBuild = 7;
+const int qubeBuild = 8;
 
 /// Плашка «Вышла новая версия» в боковой панели: скачивает установщик сама
 /// и открывает его — ходить на GitHub не нужно.
@@ -453,8 +453,18 @@ class _QubeUpdateBannerState extends State<QubeUpdateBanner> {
       }
       await sink.close();
       if (Platform.isWindows) {
-        await Process.start(file.path, [], mode: ProcessStartMode.detached);
-        _done = 'В открывшемся окне нажмите «Установить» — qubeDesk обновится';
+        // Запустить установщик рядом с работающей программой нельзя: он видит
+        // открытый qubeDesk и отдаёт ему управление — окно установки не
+        // появляется. Ставим тихо, с правами администратора: установщик сам
+        // закроет старую версию, а затем открываем новую
+        final exe = file.path.replaceAll("'", "''");
+        await Process.start('powershell.exe', [
+          '-NoProfile', '-WindowStyle', 'Hidden', '-Command',
+          "Start-Process -FilePath '$exe' -ArgumentList '--silent-install' -Verb RunAs -Wait; "
+              "Start-Sleep 3; \$p = Join-Path \$env:ProgramFiles 'qubeDesk\\qubeDesk.exe'; "
+              "if (Test-Path \$p) { Start-Process \$p }",
+        ], mode: ProcessStartMode.detached);
+        _done = 'Windows спросит разрешение — нажмите «Да». qubeDesk обновится и откроется сам';
       } else {
         await Process.run('open', [file.path]);
         _done = 'Перетащите qubeDesk в «Программы» и замените старую';

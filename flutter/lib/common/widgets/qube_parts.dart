@@ -269,3 +269,262 @@ class QubeInviteView extends StatelessWidget {
     );
   }
 }
+
+// ── Окно на компьютере, к которому подключились ─────────────────────
+
+const Color qubeDanger = Color(0xFFFF453A);
+const Color qubeOk = Color(0xFF34C759);
+
+/// Номер группами по три: 69 983 058
+String qubeId(String id) {
+  final d = id.replaceAll(' ', '');
+  final b = StringBuffer();
+  for (var i = 0; i < d.length; i++) {
+    if (i > 0 && (d.length - i) % 3 == 0) b.write(' ');
+    b.write(d[i]);
+  }
+  return b.toString();
+}
+
+/// Шапка: кто подключился. «Имя · qubeOS» показываем именем и меткой «qubeOS».
+class QubeClientHeader extends StatelessWidget {
+  final String name, peerId, status;
+  final String? kind;
+  final bool live;
+  final VoidCallback? onChat;
+  const QubeClientHeader(
+      {super.key,
+      required this.name,
+      required this.peerId,
+      required this.status,
+      this.kind,
+      this.live = true,
+      this.onChat});
+
+  @override
+  Widget build(BuildContext context) {
+    final mut = _mut(context);
+    final fromQube = name.endsWith(' · qubeOS');
+    final who = fromQube ? name.substring(0, name.length - 9) : name;
+    return QubeGlass(
+      radius: 20,
+      padding: const EdgeInsets.all(14),
+      child: Row(children: [
+        Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: const LinearGradient(
+                colors: [qubePink, qubePinkSoft],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight),
+          ),
+          child: Text(who.isEmpty ? '?' : who.characters.first.toUpperCase(),
+              style: qubeTitle(26, weight: FontWeight.w600)
+                  .copyWith(color: Colors.white)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Flexible(
+                  child: Text(who,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: qubeTitle(17, weight: FontWeight.w600)),
+                ),
+                if (fromQube) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: qubePink.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: const Text('qubeOS',
+                        style: TextStyle(
+                            fontSize: 10.5,
+                            color: qubePink,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ]),
+              const SizedBox(height: 2),
+              Text(
+                  kind == null
+                      ? qubeId(peerId)
+                      : '${qubeId(peerId)} · $kind',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12.5, color: mut)),
+              const SizedBox(height: 4),
+              Row(children: [
+                Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: live ? qubeOk : mut)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12.5)),
+                ),
+              ]),
+            ],
+          ),
+        ),
+        if (onChat != null)
+          QubeIconButton(
+              icon: Icons.chat_bubble_outline_rounded,
+              tooltip: 'Чат',
+              size: 36,
+              onTap: onChat),
+      ]),
+    );
+  }
+}
+
+/// Плитка разрешения: включено — розовая, выключено — серая; подпись снизу.
+class QubePermTile extends StatelessWidget {
+  final bool enabled, canModify;
+  final IconData icon;
+  final String label, tooltip;
+  final VoidCallback? onTap;
+  const QubePermTile(
+      {super.key,
+      required this.enabled,
+      required this.icon,
+      required this.label,
+      required this.tooltip,
+      this.canModify = true,
+      this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final mut = _mut(context);
+    return Tooltip(
+      message: '$tooltip: ${enabled ? 'включено' : 'выключено'}',
+      waitDuration: Duration.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: canModify ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: enabled
+                ? qubePink.withOpacity(canModify ? 0.16 : 0.09)
+                : (dark ? Colors.white : Colors.black).withOpacity(0.05),
+            border: Border.all(
+                color: enabled
+                    ? qubePink.withOpacity(0.35)
+                    : (dark ? Colors.white : Colors.black).withOpacity(0.08)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 21, color: enabled ? qubePink : mut),
+              const SizedBox(height: 4),
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 10.5, color: enabled ? null : mut)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum QubeCmKind { primary, danger, neutral }
+
+/// Кнопка окна подключения: главная — розовая, «Отключить» — красная.
+class QubeCmButton extends StatelessWidget {
+  final String text;
+  final QubeCmKind kind;
+  final Widget? icon;
+  final GestureTapCallback? onTap;
+  final GestureTapDownCallback? onTapDown;
+  const QubeCmButton(
+      {super.key,
+      required this.text,
+      this.kind = QubeCmKind.neutral,
+      this.icon,
+      this.onTap,
+      this.onTapDown});
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final r = BorderRadius.circular(14);
+    final fg = kind == QubeCmKind.neutral
+        ? (dark ? Colors.white : qubeInk)
+        : Colors.white;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: r,
+        onTap: onTap,
+        onTapDown: onTapDown,
+        child: Ink(
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: r,
+            gradient: kind == QubeCmKind.primary
+                ? const LinearGradient(colors: [qubePink, qubePinkSoft])
+                : null,
+            color: kind == QubeCmKind.danger
+                ? qubeDanger
+                : kind == QubeCmKind.neutral
+                    ? (dark ? Colors.white : Colors.black).withOpacity(0.08)
+                    : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                IconTheme(
+                    data: IconThemeData(color: fg, size: 17), child: icon!),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: fg,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Панель во время подключения ─────────────────────────────────────
+
+/// Цвета панели: тёмное стекло, кнопки — светлая подложка, наведение — розовый
+class QubeBar {
+  static const Color bg = Color(0xEB1C1C1E);
+  static const Color button = Color(0x1FFFFFFF);
+  static const Color hover = qubePink;
+  static const Color active = Color(0x59F747A2);
+  static const Color close = Color(0x40FF453A);
+  static const Color closeHover = qubeDanger;
+  static const double size = 34;
+  static const double radius = 10;
+}

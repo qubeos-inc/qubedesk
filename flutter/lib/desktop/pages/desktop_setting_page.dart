@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter_hbb/common/widgets/qube_glass.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -276,23 +277,23 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // qubeDesk: настройки в стиле qubeOS — розовый фон, боковая панель, стекло
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
-      body: _buildBlock(
+      backgroundColor: Colors.transparent,
+      body: QubeBackdrop(
+          child: _buildBlock(
         children: <Widget>[
-          SizedBox(
-            width: _kTabWidth,
-            child: Column(
-              children: [
-                _header(context),
-                Flexible(child: _listView(tabs: _settingTabs())),
-              ],
+          QubeSidebar(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 14),
+              child: Text(translate('Settings'),
+                  maxLines: 1, style: qubeTitle(26, weight: FontWeight.w600)),
             ),
-          ),
-          const VerticalDivider(width: 1),
+            Expanded(child: _listView(tabs: _settingTabs())),
+          ]),
           Expanded(
             child: Container(
-              color: Theme.of(context).scaffoldBackgroundColor,
+              color: Colors.transparent,
               child: PageView(
                 controller: controller,
                 physics: NeverScrollableScrollPhysics(),
@@ -301,7 +302,7 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
             ),
           )
         ],
-      ),
+      )),
     );
   }
 
@@ -355,6 +356,21 @@ class _DesktopSettingPageState extends State<DesktopSettingPage>
   Widget _listItem({required _TabInfo tab}) {
     return Obx(() {
       bool selected = tab.key == selectedTab.value;
+      return QubeSideItem(
+          icon: selected ? tab.selected : tab.unselected,
+          label: translate(tab.label),
+          selected: selected,
+          onTap: () {
+            if (selectedTab.value != tab.key) {
+              int index = DesktopSettingPage.tabKeys.indexOf(tab.key);
+              if (index == -1) {
+                return;
+              }
+              controller.jumpToPage(index);
+            }
+            selectedTab.value = tab.key;
+          });
+      // ignore: dead_code
       return SizedBox(
         width: _kTabWidth,
         height: _kTabHeight,
@@ -2680,7 +2696,10 @@ Widget _Card(
       Flexible(
         child: SizedBox(
           width: _kCardFixedWidth,
-          child: Card(
+          // qubeDesk: карточка — стекло qubeOS, заголовок Jost
+          child: QubeGlass(
+            radius: 20,
+            padding: const EdgeInsets.fromLTRB(6, 4, 6, 12),
             child: Column(
               children: [
                 Row(
@@ -2689,18 +2708,18 @@ Widget _Card(
                         child: Text(
                       translate(title),
                       textAlign: TextAlign.start,
-                      style: const TextStyle(
-                        fontSize: _kTitleFontSize,
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: qubeTitle(17, weight: FontWeight.w600),
                     )),
                     ...?title_suffix
                   ],
-                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 10),
+                ).marginOnly(left: _kContentHMargin, top: 10, bottom: 8),
                 ...children
                     .map((e) => e.marginOnly(top: 4, right: _kContentHMargin)),
               ],
-            ).marginOnly(bottom: 10),
-          ).marginOnly(left: _kCardLeftMargin, top: 15),
+            ),
+          ).marginOnly(left: _kCardLeftMargin, top: 15, right: 16),
         ),
       ),
     ],

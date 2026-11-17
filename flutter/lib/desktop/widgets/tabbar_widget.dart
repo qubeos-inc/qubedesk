@@ -1163,28 +1163,26 @@ class _TabState extends State<_Tab> with RestorationMixin {
           restoreHover.value = value;
         },
         onTap: () => widget.onTap(),
+        // qubeDesk: выбранная вкладка — розовая «таблетка», как в qubeOS
         child: Container(
-            decoration: isSelected && widget.selectedBorderColor != null
-                ? BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        color: widget.selectedBorderColor!,
-                        width: 1,
-                      ),
-                    ),
-                  )
-                : null,
-            child: Container(
-              color: isSelected
-                  ? widget.selectedTabBackgroundColor
-                  : widget.unSelectedTabBackgroundColor,
+            child: Obx(() => Container(
+              margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: isSelected
+                    ? const Color(0xFFF747A2).withOpacity(0.16)
+                    : hover.value
+                        ? Colors.grey.withOpacity(0.12)
+                        : Colors.transparent,
+              ),
               child: Row(
                 children: [
                   SizedBox(
                       // _kTabBarHeight also displays normally
-                      height: _showTabBarBottomDivider(widget.tabType)
-                          ? _kTabBarHeight - 1
-                          : _kTabBarHeight,
+                      height: (_showTabBarBottomDivider(widget.tabType)
+                              ? _kTabBarHeight - 1
+                              : _kTabBarHeight) -
+                          10,
                       child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -1195,18 +1193,9 @@ class _TabState extends State<_Tab> with RestorationMixin {
                                   onClose: () => widget.onClose(),
                                 )))
                           ])).paddingOnly(left: 10, right: 5),
-                  Offstage(
-                    offstage: !showDivider,
-                    child: VerticalDivider(
-                      width: 1,
-                      indent: _kDividerIndent,
-                      endIndent: _kDividerIndent,
-                      color: MyTheme.tabbar(context).dividerColor,
-                    ),
-                  )
                 ],
               ),
-            )),
+            ))),
       ),
     );
   }
@@ -1467,7 +1456,7 @@ class TabbarTheme extends ThemeExtension<TabbarTheme> {
 
   static const light = TabbarTheme(
       selectedTabIconColor: MyTheme.accent,
-      unSelectedTabIconColor: Color.fromARGB(255, 162, 203, 241),
+      unSelectedTabIconColor: Color(0xFFED99BB),
       selectedTextColor: Colors.black,
       unSelectedTextColor: Color.fromARGB(255, 112, 112, 112),
       selectedIconColor: Color.fromARGB(255, 26, 26, 26),
@@ -1479,7 +1468,7 @@ class TabbarTheme extends ThemeExtension<TabbarTheme> {
 
   static const dark = TabbarTheme(
       selectedTabIconColor: MyTheme.accent,
-      unSelectedTabIconColor: Color.fromARGB(255, 30, 65, 98),
+      unSelectedTabIconColor: Color(0xFFED99BB),
       selectedTextColor: Colors.white,
       unSelectedTextColor: Color.fromARGB(255, 192, 192, 192),
       selectedIconColor: Color.fromARGB(255, 192, 192, 192),

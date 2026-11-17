@@ -1,5 +1,7 @@
 // original cm window in Sciter version.
 
+import 'package:flutter_hbb/common/widgets/qube_glass.dart';
+import 'package:flutter_hbb/common/widgets/qube_parts.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -93,9 +95,10 @@ class _DesktopServerPageState extends State<DesktopServerPage>
       ],
       child: Consumer<ServerModel>(
         builder: (context, serverModel, child) {
+          // qubeDesk: розовый фон qubeOS под стеклянными карточками
           final body = Scaffold(
-            backgroundColor: Theme.of(context).colorScheme.background,
-            body: ConnectionManager(),
+            backgroundColor: Colors.transparent,
+            body: QubeBackdrop(child: ConnectionManager()),
           );
           return isLinux
               ? buildVirtualWindowFrame(context, body)
@@ -455,128 +458,41 @@ class _CmHeaderState extends State<_CmHeader>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10.0),
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            Color(0xff00bfe1),
-            Color(0xff0071ff),
-          ],
-        ),
-      ),
-      margin: EdgeInsets.symmetric(horizontal: 5.0, vertical: 10.0),
-      padding: EdgeInsets.only(
-        top: 10.0,
-        bottom: 10.0,
-        left: 10.0,
-        right: 5.0,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildClientAvatar().marginOnly(right: 10.0),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                FittedBox(
-                    child: Text(
-                  client.name,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  maxLines: 1,
-                )),
-                FittedBox(
-                  child: Text(
-                    "(${client.peerId})",
-                    style: TextStyle(color: Colors.white, fontSize: 14),
-                  ),
-                ),
-                if (client.type_() == ClientType.terminal)
-                  FittedBox(
-                    child: Text(
-                      translate("Terminal"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                if (client.type_() == ClientType.file)
-                  FittedBox(
-                    child: Text(
-                      translate("Transfer file"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                if (client.type_() == ClientType.camera)
-                  FittedBox(
-                    child: Text(
-                      translate("View camera"),
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                if (client.portForward.isNotEmpty)
-                  FittedBox(
-                    child: Text(
-                      "Port Forward: ${client.portForward}",
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                SizedBox(height: 10.0),
-                FittedBox(
-                    child: Row(
-                  children: [
-                    Text(
-                      client.authorized
-                          ? client.disconnected
-                              ? translate("Disconnected")
-                              : translate("Connected")
-                          : "${translate("Request access to your device")}...",
-                      style: TextStyle(color: Colors.white),
-                    ).marginOnly(right: 8.0),
-                    if (client.authorized)
-                      Obx(
-                        () => Text(
-                          formatDurationToTime(
-                            Duration(seconds: _time.value),
-                          ),
-                          style: TextStyle(color: Colors.white),
-                        ),
-                      )
-                  ],
-                ))
-              ],
-            ),
-          ),
-          Offstage(
-            offstage: !client.authorized ||
-                (client.type_() != ClientType.remote &&
-                    client.type_() != ClientType.file &&
-                    client.type_() != ClientType.camera),
-            child: IconButton(
-              onPressed: () => checkClickTime(client.id, () {
-                if (client.type_() == ClientType.file) {
-                  gFFI.chatModel.toggleCMFilePage();
-                } else {
-                  gFFI.chatModel
-                      .toggleCMChatPage(MessageKey(client.peerId, client.id));
-                }
-              }),
-              icon: SvgPicture.asset(client.type_() == ClientType.file
-                  ? 'assets/file_transfer.svg'
-                  : 'assets/chat2.svg'),
-              splashRadius: kDesktopIconButtonSplashRadius,
-            ),
-          )
-        ],
-      ),
-    );
+    // qubeDesk: шапка в стиле qubeOS — кто подключился, номер, связь и время
+    final chat = client.authorized &&
+        (client.type_() == ClientType.remote ||
+            client.type_() == ClientType.file ||
+            client.type_() == ClientType.camera);
+    final kind = client.type_() == ClientType.terminal
+        ? 'терминал'
+        : client.type_() == ClientType.file
+            ? 'передача файлов'
+            : client.type_() == ClientType.camera
+                ? 'камера'
+                : client.portForward.isNotEmpty
+                    ? 'туннель ${client.portForward}'
+                    : null;
+    return Obx(() => QubeClientHeader(
+          name: client.name,
+          peerId: client.peerId,
+          kind: kind,
+          live: client.authorized && !client.disconnected,
+          status: client.authorized
+              ? client.disconnected
+                  ? 'Отключено'
+                  : 'Подключено · ${formatDurationToTime(Duration(seconds: _time.value))}'
+              : 'Хочет подключиться к экрану',
+          onChat: chat
+              ? () => checkClickTime(client.id, () {
+                    if (client.type_() == ClientType.file) {
+                      gFFI.chatModel.toggleCMFilePage();
+                    } else {
+                      gFFI.chatModel.toggleCMChatPage(
+                          MessageKey(client.peerId, client.id));
+                    }
+                  })
+              : null,
+        ).marginSymmetric(horizontal: 5, vertical: 10));
   }
 
   @override
@@ -627,74 +543,60 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
   Widget buildPermissionIcon(bool enabled, IconData iconData,
       Function(bool)? onTap, String tooltipText,
       {required bool canModify}) {
-    return Tooltip(
-      message: "$tooltipText: ${enabled ? "ON" : "OFF"}",
-      waitDuration: Duration.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          color: enabled
-              ? (canModify ? MyTheme.accent : MyTheme.accent.withOpacity(0.6))
-              : Colors.grey[700],
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        padding: EdgeInsets.all(8.0),
-        child: InkWell(
-          onTap: canModify
-              ? () =>
-                  checkClickTime(widget.client.id, () => onTap?.call(!enabled))
-              : null,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              Expanded(
-                child: Icon(
-                  iconData,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    // qubeDesk: плитка с подписью — розовая, когда включено
+    return QubePermTile(
+      enabled: enabled,
+      icon: iconData,
+      label: _permLabel(tooltipText),
+      tooltip: tooltipText,
+      canModify: canModify,
+      onTap: () => checkClickTime(widget.client.id, () => onTap?.call(!enabled)),
     );
+  }
+
+  /// Короткие подписи под плитками — полное название остаётся в подсказке
+  String _permLabel(String t) {
+    final l = t.toLowerCase();
+    if (l.contains('клавиат') || l.contains('keyboard')) return 'Клавиатура';
+    if (l.contains('буфер') || l.contains('clipboard')) return 'Буфер';
+    if (l.contains('звук') || l.contains('audio')) return 'Звук';
+    if (l.contains('файл') || l.contains('file')) return 'Файлы';
+    if (l.contains('перезап') || l.contains('restart')) return 'Перезапуск';
+    if (l.contains('запис') || l.contains('record')) return 'Запись';
+    if (l.contains('блок') || l.contains('block')) return 'Блок. ввода';
+    if (l.contains('приват') || l.contains('privacy')) return 'Скрыть экран';
+    if (l.contains('принтер') || l.contains('print')) return 'Принтер';
+    if (l.contains('камер') || l.contains('camera')) return 'Камера';
+    if (l.contains('терминал') || l.contains('terminal')) return 'Терминал';
+    if (l.contains('туннел') || l.contains('tunnel')) return 'Туннель';
+    return t.split(' ').first;
   }
 
   @override
   Widget build(BuildContext context) {
     final crossAxisCount = 4;
-    final spacing = 10.0;
+    final spacing = 8.0;
     final canModifyPermission =
         bind.mainGetBuildinOption(key: kOptionEnablePermChangeInAcceptWindow) !=
             'N';
-    return Container(
-      width: double.infinity,
-      height: 160.0,
+    // qubeDesk: стеклянная карточка «Разрешения»
+    return QubeGlass(
+      radius: 20,
       margin: EdgeInsets.all(5.0),
-      padding: EdgeInsets.all(5.0),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10.0),
-        color: Theme.of(context).colorScheme.background,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            spreadRadius: 1,
-            blurRadius: 1,
-            offset: Offset(0, 1.5),
-          ),
-        ],
-      ),
+      padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: SizedBox(
+      width: double.infinity,
+      height: 200.0,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            translate("Permissions"),
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ).marginOnly(left: 4.0, bottom: 8.0),
+          QubeCardLabel(Icons.tune_rounded, translate("Permissions"))
+              .marginOnly(left: 2.0, bottom: 10.0),
           Expanded(
             child: GridView.count(
               crossAxisCount: crossAxisCount,
-              padding: EdgeInsets.symmetric(horizontal: spacing),
+              padding: EdgeInsets.zero,
+              childAspectRatio: 0.95,
               mainAxisSpacing: spacing,
               crossAxisSpacing: spacing,
               children: client.type_() == ClientType.camera
@@ -858,6 +760,7 @@ class _PrivilegeBoardState extends State<_PrivilegeBoard> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1143,53 +1046,28 @@ class _CmControlPanel extends StatelessWidget {
       String? tooltip,
       GestureTapDownCallback? onTapDown}) {
     assert(!(onClick == null && onTapDown == null));
-    Widget textWidget;
-    if (icon != null) {
-      textWidget = Text(
-        translate(text),
-        style: TextStyle(color: textColor),
-        textAlign: TextAlign.center,
-      );
-    } else {
-      textWidget = Expanded(
-        child: Text(
-          translate(text),
-          style: TextStyle(color: textColor),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-    final borderRadius = BorderRadius.circular(10.0);
-    final btn = Container(
-      height: 28,
-      decoration: BoxDecoration(
-          color: color, borderRadius: borderRadius, border: border),
-      child: InkWell(
-        borderRadius: borderRadius,
-        onTap: () {
-          if (onClick == null) return;
-          checkClickTime(client.id, onClick);
-        },
-        onTapDown: (details) {
-          if (onTapDown == null) return;
-          checkClickTime(client.id, () {
-            onTapDown.call(details);
-          });
-        },
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Offstage(offstage: icon == null, child: icon).marginOnly(right: 5),
-            textWidget,
-          ],
-        ),
-      ),
+    // qubeDesk: красное — «Отключить»/«Отклонить», цветное — главное действие,
+    // остальное — нейтральная кнопка
+    final c = color?.value;
+    final danger = c == Colors.red.value ||
+        c == Colors.redAccent.value ||
+        c == Colors.red[700]?.value;
+    final kind = danger
+        ? QubeCmKind.danger
+        : (color == null || color == Colors.transparent || border != null)
+            ? QubeCmKind.neutral
+            : QubeCmKind.primary;
+    final btn = QubeCmButton(
+      text: translate(text),
+      kind: kind,
+      icon: icon,
+      onTap: onClick == null ? null : () => checkClickTime(client.id, onClick),
+      onTapDown: onTapDown == null
+          ? null
+          : (d) => checkClickTime(client.id, () => onTapDown.call(d)),
     );
     return (tooltip != null
-            ? Tooltip(
-                message: translate(tooltip),
-                child: btn,
-              )
+            ? Tooltip(message: translate(tooltip), child: btn)
             : btn)
         .marginAll(4);
   }

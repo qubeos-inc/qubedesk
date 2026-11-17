@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../common/widgets/qube_parts.dart';
 import '../../common/widgets/qube_live.dart';
 import 'dart:async';
 
@@ -326,21 +327,22 @@ class ToolbarState {
 }
 
 class _ToolbarTheme {
-  static const Color blueColor = MyTheme.button;
-  static const Color hoverBlueColor = MyTheme.accent;
-  static Color inactiveColor = Colors.grey[800]!;
-  static Color hoverInactiveColor = Colors.grey[850]!;
+  // qubeDesk: кнопки — светлая подложка на тёмном стекле, наведение — розовый
+  static const Color blueColor = QubeBar.button;
+  static const Color hoverBlueColor = QubeBar.hover;
+  static Color inactiveColor = QubeBar.button;
+  static Color hoverInactiveColor = QubeBar.active;
 
-  static const Color redColor = Colors.redAccent;
-  static const Color hoverRedColor = Colors.red;
+  static const Color redColor = QubeBar.close;
+  static const Color hoverRedColor = QubeBar.closeHover;
   // kMinInteractiveDimension
   static const double height = 20.0;
   static const double dividerHeight = 12.0;
 
-  static const double buttonSize = 32;
+  static const double buttonSize = 34;
   static const double buttonHMargin = 2;
   static const double buttonVMargin = 6;
-  static const double iconRadius = 8;
+  static const double iconRadius = 10;
   static const double elevation = 3;
 
   static double dividerSpaceToAction = isWindows ? 8 : 14;
@@ -851,7 +853,7 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     // qubeDesk: позвать ещё человека к этому экрану (сисадмин зовёт управляющую)
     if (qubeLoggedIn()) {
       toolbarItems.add(_IconMenuButton(
-        icon: const Icon(Icons.group_add_outlined, color: Colors.white, size: 18),
+        icon: const Icon(Icons.group_add_outlined, color: Colors.white, size: 19),
         tooltip: 'Позвать ещё человека',
         color: _ToolbarTheme.blueColor,
         hoverColor: _ToolbarTheme.hoverBlueColor,
@@ -863,7 +865,8 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
     }
     if (!isWeb) toolbarItems.add(_RecordMenu());
     toolbarItems.add(_CloseMenu(id: widget.id, ffi: widget.ffi));
-    final toolbarBorderRadius = BorderRadius.all(Radius.circular(4.0));
+    // qubeDesk: панель — тёмное стекло с крупным скруглением, как в qubeOS
+    final toolbarBorderRadius = BorderRadius.all(Radius.circular(16.0));
     // innerAxis: how the toolbar icons themselves flow.
     // outerAxis: how the toolbar block and the handle stack against each other
     // (perpendicular to the dock edge, so the handle hangs off the interior face).
@@ -873,14 +876,10 @@ class _RemoteToolbarState extends State<RemoteToolbar> {
         ? SizedBox(width: _ToolbarTheme.buttonHMargin * 2)
         : SizedBox(height: _ToolbarTheme.buttonHMargin * 2);
     final toolbarMaterial = Material(
-      elevation: _ToolbarTheme.elevation,
-      shadowColor: MyTheme.color(context).shadow,
+      elevation: 8,
+      shadowColor: Colors.black54,
       borderRadius: toolbarBorderRadius,
-      color: Theme.of(context)
-          .menuBarTheme
-          .style
-          ?.backgroundColor
-          ?.resolve(MaterialState.values.toSet()),
+      color: QubeBar.bg,
       child: SingleChildScrollView(
         scrollDirection: innerAxis,
         child: Theme(
@@ -955,7 +954,7 @@ class _PinMenu extends StatelessWidget {
         tooltip: state.pin ? 'Unpin Toolbar' : 'Pin Toolbar',
         onPressed: state.switchPin,
         color:
-            state.pin ? _ToolbarTheme.blueColor : _ToolbarTheme.inactiveColor,
+            state.pin ? QubeBar.active : _ToolbarTheme.inactiveColor,
         hoverColor: state.pin
             ? _ToolbarTheme.hoverBlueColor
             : _ToolbarTheme.hoverInactiveColor,
@@ -977,7 +976,7 @@ class _MobileActionMenu extends StatelessWidget {
           onPressed: () => ffi.dialogManager.setMobileActionsOverlayVisible(
               !ffi.dialogManager.mobileActionsOverlayVisible.value),
           color: ffi.dialogManager.mobileActionsOverlayVisible.isTrue
-              ? _ToolbarTheme.blueColor
+              ? QubeBar.active
               : _ToolbarTheme.inactiveColor,
           hoverColor: ffi.dialogManager.mobileActionsOverlayVisible.isTrue
               ? _ToolbarTheme.hoverBlueColor
@@ -1151,7 +1150,7 @@ class _MonitorMenu extends StatelessWidget {
         '${i + 1}',
         style: TextStyle(
           color: i == curDisplay
-              ? _ToolbarTheme.blueColor
+              ? QubeBar.active
               : _ToolbarTheme.inactiveColor,
           fontSize: 12,
           fontWeight: FontWeight.bold,
@@ -1182,7 +1181,7 @@ class _MonitorMenu extends StatelessWidget {
             vMargin: isMulti ? null : 12,
             topLevel: false,
             color: i == display.value
-                ? _ToolbarTheme.blueColor
+                ? QubeBar.active
                 : _ToolbarTheme.inactiveColor,
             hoverColor: i == display.value
                 ? _ToolbarTheme.hoverBlueColor
@@ -3097,7 +3096,7 @@ class _IconMenuButtonState extends State<_IconMenuButton> {
                           BorderRadius.circular(_ToolbarTheme.iconRadius),
                       color: hover ? widget.hoverColor : widget.color,
                     ),
-                    child: icon)),
+                    child: Center(child: icon))),
           )),
     ).marginSymmetric(
         horizontal: widget.hMargin ?? _ToolbarTheme.buttonHMargin,
@@ -3666,16 +3665,10 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
     return TextButtonTheme(
       data: TextButtonThemeData(style: buttonStyle),
       child: Container(
+        // qubeDesk: ручка панели — то же тёмное стекло
         decoration: BoxDecoration(
-          color: Theme.of(context)
-              .menuBarTheme
-              .style
-              ?.backgroundColor
-              ?.resolve(MaterialState.values.toSet()),
-          border: Border.all(
-            color: _ToolbarTheme.borderColor(context),
-            width: 1,
-          ),
+          color: QubeBar.bg,
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
           borderRadius: widget.borderRadius,
         ),
         child: SizedBox(
